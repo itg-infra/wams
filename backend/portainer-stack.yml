@@ -1,0 +1,46 @@
+services:
+  api:
+    image: "ghcr.io/itg-infra/wams-prod-be:production"
+    env_file:
+      - stack.env
+    ports:
+      - "0.0.0.0:8080:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Persistent files live in an explicit VPS directory, not in the container layer.
+      - /opt/wams/wams-api/storage:/app/storage
+      # The API writes rolling Serilog files under /app/logs.
+      - /opt/wams/wams-api/logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - wams-net
+
+  postgres:
+    image: "postgres:17-alpine"
+    ports:
+      # PUBLIC access for DBeaver. For private mode, swap this line
+      # with the localhost-only mapping below before updating the stack.
+      - "0.0.0.0:15432:5432"
+      # PRIVATE recommended mode: accessible only through an SSH tunnel.
+      # - "127.0.0.1:15432:5432"
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+    restart: unless-stopped
+    networks:
+      - wams-net
+
+volumes:
+  postgres_data:
+
+networks:
+  wams-net:

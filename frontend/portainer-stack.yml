@@ -1,0 +1,6 @@
+services:
+  web:
+    image: "ghcr.io/itg-infra/wams-prod-fe:production"
+    ports:
+      - "0.0.0.0:3000:80"
+    restart: unless-stopped

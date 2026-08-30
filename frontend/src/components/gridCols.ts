@@ -1,0 +1,5 @@
+export const COST_GRID_COLS =
+  "grid-cols-[120px_180px_120px_140px_160px_160px_160px_160px_160px_180px_100px_150px_140px_120px_150px_150px_180px_120px_120px_140px_220px]";
+
+export  const COST_GRID_COLS_PLAN_REAL =
+    "grid-cols-[120px_180px_120px_140px_160px_180px_100px_350px_140px_120px_150px_180px_180px_180px_140px_220px]";

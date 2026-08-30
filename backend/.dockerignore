@@ -1,0 +1,43 @@
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/.idea
+
+# Build outputs
+**/bin
+**/obj
+
+# Logs
+**/logs
+
+# Secrets - never include in image context
+.env
+.env.*
+!.env.example
+
+# Client documents and other data files - never include in image context
+**/*.pdf
+**/*.xlsx
+**/*.csv
+
+# Docs & meta
+**/README.md
+**/CHANGELOG.md
+**/*.md
+!src/**/*.md
+
+# Dev tooling
+Makefile
+.editorconfig
+.gitattributes
+
+# Docker files themselves (avoid recursive copy)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Test projects (not needed in runtime image)
+**/tests
+**/*.Tests
+**/*.Test

@@ -1,0 +1,35 @@
+# Secrets and local configuration
+.env
+*.env
+!.env.example
+
+# .NET build output
+**/bin/
+**/obj/
+**/artifacts/
+**/TestResults/
+
+# Node/Vite output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+
+# Logs and local tooling
+*.log
+.vs/
+.vscode/*.local.json
+.idea/
+.claude/
+.playwright-cli/
+
+# Client/import documents should stay outside source control
+*.xlsx
+*.pdf
+*.zip
+
+# OS/editor files
+.DS_Store
+*.swp
+
+docs/
+.vscode/

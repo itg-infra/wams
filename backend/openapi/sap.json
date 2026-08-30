@@ -1,0 +1,1447 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "SAP Business One - WAMS",
+    "description": "REST API monolith yang membungkus SAP B1 DI API.",
+    "version": "v1"
+  },
+  "paths": {
+    "/WAMS/APDP": {
+      "post": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPDPDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPDPDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPDPDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "CardCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPDPDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPDPDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPDPDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APDP/{docEntry}": {
+      "get": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APDP/{docEntry}/cancel": {
+      "post": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APDP/{docEntry}/close": {
+      "post": {
+        "tags": [
+          "AP Down Payment"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APInvoice": {
+      "post": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPInvoiceDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPInvoiceDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAPInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "CardCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPInvoiceDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPInvoiceDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAPInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APInvoice/{docEntry}": {
+      "get": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APInvoice/{docEntry}/cancel": {
+      "post": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/APInvoice/{docEntry}/close": {
+      "post": {
+        "tags": [
+          "AP Invoice"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkBranch": {
+      "get": {
+        "tags": [
+          "Cost Center Branch"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "WhsCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkDepartment": {
+      "get": {
+        "tags": [
+          "Cost Center Department"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkDivision": {
+      "get": {
+        "tags": [
+          "Cost Center Divisi"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ItemCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkProduct": {
+      "get": {
+        "tags": [
+          "Cost Center Product"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ItemCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkWarehouse": {
+      "get": {
+        "tags": [
+          "Cost Center Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "WhsCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkCostItem": {
+      "get": {
+        "tags": [
+          "List of Item"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PPh": {
+      "get": {
+        "tags": [
+          "List of PPh"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CardCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PPn": {
+      "get": {
+        "tags": [
+          "List of PPn"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkProject": {
+      "get": {
+        "tags": [
+          "List of Project"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "BL",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkMOLOPMS": {
+      "get": {
+        "tags": [
+          "List of SPK"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkTOMOLOPMS": {
+      "get": {
+        "tags": [
+          "List of TO SPK"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkVendor": {
+      "get": {
+        "tags": [
+          "List of Vendor"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/LkWhsCode": {
+      "get": {
+        "tags": [
+          "List of Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "Company",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PurchaseOrders": {
+      "post": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseOrderDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseOrderDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "CardCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePurchaseOrderDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePurchaseOrderDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePurchaseOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PurchaseOrders/{docEntry}": {
+      "get": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PurchaseOrders/{docEntry}/cancel": {
+      "post": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WAMS/PurchaseOrders/{docEntry}/close": {
+      "post": {
+        "tags": [
+          "Purchase Ordes"
+        ],
+        "parameters": [
+          {
+            "name": "docEntry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "APDPLineDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "isWhTax": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "warehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "taxCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseEntry": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseLine": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "division": {
+            "type": "string",
+            "nullable": true
+          },
+          "product": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouse": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "APDPWthxDto": {
+        "type": "object",
+        "properties": {
+          "wtCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxableAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "APInvoiceDPDto": {
+        "type": "object",
+        "properties": {
+          "baseEntryDP": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amountToDraw": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "APInvoiceLineDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "isWhTax": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "warehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "taxCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseEntry": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseLine": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "division": {
+            "type": "string",
+            "nullable": true
+          },
+          "product": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouse": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "APInvoiceWthxDto": {
+        "type": "object",
+        "properties": {
+          "wtCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxableAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAPDPDto": {
+        "type": "object",
+        "properties": {
+          "cardCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "numAtCard": {
+            "type": "string",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "docCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APDPLineDto"
+            },
+            "nullable": true
+          },
+          "whTax": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APDPWthxDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAPInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "cardCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "numAtCard": {
+            "type": "string",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "docCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APInvoiceLineDto"
+            },
+            "nullable": true
+          },
+          "whTax": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APInvoiceWthxDto"
+            },
+            "nullable": true
+          },
+          "tapdp": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APInvoiceDPDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatePurchaseOrderDto": {
+        "type": "object",
+        "properties": {
+          "cardCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "numAtCard": {
+            "type": "string",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "docCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseOrderLineDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "warehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "taxCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "division": {
+            "type": "string",
+            "nullable": true
+          },
+          "product": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouse": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateAPDPDto": {
+        "type": "object",
+        "properties": {
+          "docEntry": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APDPLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateAPInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "docEntry": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APInvoiceLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePurchaseOrderDto": {
+        "type": "object",
+        "properties": {
+          "docEntry": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "docDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "comments": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
