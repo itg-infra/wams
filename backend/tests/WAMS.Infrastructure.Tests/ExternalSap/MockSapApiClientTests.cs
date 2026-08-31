@@ -28,7 +28,7 @@ public class MockSapApiClientTests
     {
         var request = new SapCreateApInvoiceRequest("AP-001", "V-001", DateTime.UtcNow, null,
             [new SapApLineItem("ITEM-A", "Item A", "ACC-01", 1m, 100m, "PCS", 100m, 0m, null, null, null)],
-            WhTax: [new SapWhTaxLine("PPH23", 100m)], ApdpDocEntry: null, DrawAmount: null);
+            WhTax: [new SapWhTaxLine("PPH23", 100m)], Tapdp: null);
 
         var result = await _sut.CreateApInvoiceAsync(request, TestContext.Current.CancellationToken);
 

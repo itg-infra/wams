@@ -84,7 +84,15 @@ public record PurchaseOrderResponse(
     string CreatedByName,
     DateTime? GeneratedAt,
     string? GeneratedByName,
-    IReadOnlyList<PoApprover> Approvers);
+    IReadOnlyList<PoApprover> Approvers,
+    PurchaseOrderApdpResponse? Apdp = null);
+
+public record PurchaseOrderApdpResponse(
+    string Status,
+    int? SapDocEntry,
+    decimal Amount,
+    DateTime? GeneratedAt,
+    string? Error);
 
 public record PurchaseOrderItemResponse(
     long Id,

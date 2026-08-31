@@ -16,6 +16,11 @@ public class PurchaseOrder : BaseEntity
     public PurchaseOrderStatus Status { get; set; } = PurchaseOrderStatus.Draft;
     public string? SapPoNumber { get; set; }
     public int? SapDocEntry { get; set; }
+    public int? SapApdpDocEntry { get; set; }
+    public DateTime? SapApdpGeneratedAt { get; set; }
+    public string? SapApdpError { get; set; }
+    public DateTime? ApdpGenerationClaimedAt { get; set; }
+    public string? ApdpGenerationClaimToken { get; set; }
     public DateTime? GenerationClaimedAt { get; set; }
     public string? GenerationClaimToken { get; set; }
 

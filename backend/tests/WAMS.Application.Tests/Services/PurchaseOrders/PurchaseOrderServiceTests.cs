@@ -22,6 +22,7 @@ using WAMS.Domain.Entities.Users;
 using WAMS.Domain.Entities.Vendors;
 using WAMS.Domain.Entities.Warehouses;
 using WAMS.Domain.Enums;
+using WAMS.Domain.Exceptions;
 using Xunit;
 
 public class PurchaseOrderServiceTests
@@ -132,6 +133,256 @@ public class PurchaseOrderServiceTests
         "Pieces",
         false,
         null);
+
+    [Fact]
+    public async Task GenerateApdpAsync_GeneratedRfbaPo_CallsSapApdpOnlyAndPersistsDocument()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Code = "PO-2608910001",
+            VendorShadowId = 1,
+            Vendor = new VendorShadow { Id = 1, CardCode = "V-001", CardName = "Vendor One" },
+            CreatedBy = new User { Id = 7, Fullname = "Test User" },
+            Status = PurchaseOrderStatus.Generated,
+            SapDocEntry = 7001,
+            DocDate = new DateTime(2026, 8, 31),
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    Id = 501,
+                    BudgetPlanItemId = 601,
+                    IsRfba = true,
+                    ItemCode = "ITEM-001",
+                    ItemName = "RFBA item",
+                    VendorCode = "V-001",
+                    CoaCode = "501010206",
+                    UomCode = "PCS",
+                    CostValue = 100m,
+                    Quantity = 2m,
+                    TotalValue = 200m,
+                    SortOrder = 1,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        Id = 601,
+                        BudgetPlan = new BudgetPlan { Code = "BP-001", WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+        _poRepo.TryClaimForApdpGenerationAsync(91, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _sapClient.CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new SapCreateApdpResult(801));
+        _poRepo.MarkApdpGeneratedAsync(91, Arg.Any<string>(), 801, Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        result.Apdp.Should().NotBeNull();
+        result.Apdp!.SapDocEntry.Should().Be(801);
+        await _sapClient.Received(1).CreateApDownPaymentAsync(
+            Arg.Is<SapCreateApdpRequest>(request =>
+                request.ApCode == "PO-2608910001" &&
+                request.Items.Count == 1 &&
+                request.Items[0].BaseEntry == 7001 &&
+                request.Items[0].BaseLine == 0),
+            Arg.Any<CancellationToken>());
+        await _poRepo.Received(1).MarkApdpGeneratedAsync(91, Arg.Any<string>(), 801, Arg.Any<CancellationToken>());
+        await _poRepo.DidNotReceive().MarkGeneratedAsync(
+            Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateApdpAsync_SapFailure_StoresAtMostDatabaseErrorLengthAndReleasesClaim()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Code = "PO-2608910001",
+            VendorShadowId = 1,
+            Vendor = new VendorShadow { Id = 1, CardCode = "V-001", CardName = "Vendor One" },
+            CreatedBy = new User { Id = 7, Fullname = "Test User" },
+            Status = PurchaseOrderStatus.Generated,
+            SapDocEntry = 7001,
+            DocDate = new DateTime(2026, 8, 31),
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    Id = 501,
+                    BudgetPlanItemId = 601,
+                    IsRfba = true,
+                    ItemCode = "ITEM-001",
+                    ItemName = "RFBA item",
+                    VendorCode = "V-001",
+                    CoaCode = "501010206",
+                    UomCode = "PCS",
+                    CostValue = 100m,
+                    Quantity = 2m,
+                    TotalValue = 200m,
+                    SortOrder = 1,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        Id = 601,
+                        BudgetPlan = new BudgetPlan { Code = "BP-001", WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        var sapError = new string('E', 1200);
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+        _poRepo.TryClaimForApdpGenerationAsync(91, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _sapClient.CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>())
+            .Returns<SapCreateApdpResult?>(_ => throw new ValidationException(sapError));
+
+        var act = () => CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>();
+        await _poRepo.Received(1).RecordApdpFailureAsync(
+            91,
+            Arg.Any<string>(),
+            Arg.Is<string>(error => error.Length == 1000),
+            Arg.Any<CancellationToken>());
+        await _poRepo.Received(1).ReleaseApdpGenerationClaimAsync(
+            91,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateApdpAsync_DraftPo_RejectsBeforeClaimingOrCallingSap()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Status = PurchaseOrderStatus.Draft,
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    IsRfba = true,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        BudgetPlan = new BudgetPlan { WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+
+        var act = () => CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.CannotGenerateApdpOnlyGenerated);
+        await _poRepo.DidNotReceive().TryClaimForApdpGenerationAsync(
+            Arg.Any<long>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateApdpAsync_PoWithoutRfba_RejectsBeforeClaimingOrCallingSap()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Status = PurchaseOrderStatus.Generated,
+            SapDocEntry = 7001,
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    IsRfba = false,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        BudgetPlan = new BudgetPlan { WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+
+        var act = () => CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.NoRfbaItemsCannotGenerateApdp);
+        await _poRepo.DidNotReceive().TryClaimForApdpGenerationAsync(
+            Arg.Any<long>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateApdpAsync_WhenAnotherRequestOwnsClaim_ThrowsConflictWithoutCallingSap()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Status = PurchaseOrderStatus.Generated,
+            SapDocEntry = 7001,
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    IsRfba = true,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        BudgetPlan = new BudgetPlan { WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+        _poRepo.TryClaimForApdpGenerationAsync(91, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        var act = () => CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ConflictException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.ApdpGenerationInProgress(91));
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateApdpAsync_AlreadyGenerated_ReturnsExistingStateWithoutCallingSap()
+    {
+        var po = new PurchaseOrder
+        {
+            Id = 91,
+            Code = "PO-2608910001",
+            VendorShadowId = 1,
+            Vendor = new VendorShadow { Id = 1, CardCode = "V-001", CardName = "Vendor One" },
+            CreatedBy = new User { Id = 7, Fullname = "Test User" },
+            Status = PurchaseOrderStatus.Generated,
+            SapDocEntry = 7001,
+            SapApdpDocEntry = 801,
+            DocDate = new DateTime(2026, 8, 31),
+            Items =
+            [
+                new PurchaseOrderItem
+                {
+                    IsRfba = true,
+                    GrandTotal = 200m,
+                    BudgetPlanItem = new BudgetPlanItem
+                    {
+                        BudgetPlan = new BudgetPlan { WarehouseShadowId = 103 },
+                    },
+                },
+            ],
+        };
+        _poRepo.GetByIdWithItemsAsync(91, Arg.Any<CancellationToken>()).Returns(po);
+
+        var result = await CreateSut().GenerateApdpAsync(91, 7, TestContext.Current.CancellationToken);
+
+        result.Apdp.Should().NotBeNull();
+        result.Apdp!.Status.Should().Be("Generated");
+        result.Apdp.SapDocEntry.Should().Be(801);
+        await _poRepo.DidNotReceive().TryClaimForApdpGenerationAsync(
+            Arg.Any<long>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+    }
 
     [Fact]
     public void AvailablePoItemQuery_DefaultsMatchDataTableContract()
@@ -535,6 +786,180 @@ public class PurchaseOrderServiceTests
                 po.Items.Single().PpnTaxTypeCode == "PPN11" &&
                 po.Items.Single().PphRate == 2m &&
                 po.Items.Single().GrandTotal == 218.00m),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_MixedRfbaItems_RejectsBeforeCreatingPurchaseOrder()
+    {
+        var items = new List<BudgetPlanItem>
+        {
+            new()
+            {
+                Id = 101,
+                BudgetPlanId = 5,
+                VendorShadowId = 22,
+                IsRfba = true,
+                ItemShadowId = 11,
+                Item = new ItemShadow { Id = 11, ItemCode = "ITEM-A", ItemName = "Item A", AcctCode = "ACC-01", AcctName = "Account" },
+                Vendor = new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" },
+                UomMasterId = 33,
+                Uom = new UomMaster { Id = 33, Code = "PCS", Name = "Pieces" },
+                BudgetPlan = new BudgetPlan { Id = 5, Code = "BP-001" },
+            },
+            new()
+            {
+                Id = 102,
+                BudgetPlanId = 5,
+                VendorShadowId = 22,
+                IsRfba = false,
+                ItemShadowId = 12,
+                Item = new ItemShadow { Id = 12, ItemCode = "ITEM-B", ItemName = "Item B", AcctCode = "ACC-02", AcctName = "Account" },
+                Vendor = new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" },
+                UomMasterId = 33,
+                Uom = new UomMaster { Id = 33, Code = "PCS", Name = "Pieces" },
+                BudgetPlan = new BudgetPlan { Id = 5, Code = "BP-001" },
+            },
+        };
+
+        _vendorRepo.GetByIdAsync(22, Arg.Any<CancellationToken>())
+            .Returns(new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" });
+        _poRepo.GetAvailableItemsAsync(
+                22,
+                Arg.Any<List<long>>(),
+                Arg.Any<long?>(),
+                Arg.Any<List<long>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(items);
+        _uow.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+        _poRepo.GetByIdWithItemsAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new PurchaseOrder
+            {
+                Id = 1,
+                Code = "PO-001",
+                Vendor = new VendorShadow { CardCode = "V-01", CardName = "Vendor Alpha" },
+                CreatedBy = new User { Fullname = "Creator" },
+                Status = PurchaseOrderStatus.Draft,
+                Items = [],
+            });
+
+        var act = () => CreateSut().CreateAsync(
+            7,
+            new CreatePurchaseOrderRequest(22, "remark", DateTime.UtcNow, [101, 102]),
+            TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.MixedRfbaItemsNotAllowed);
+        await _poRepo.DidNotReceive().CreateAsync(
+            Arg.Any<PurchaseOrder>(),
+            Arg.Any<CancellationToken>());
+        await _codeCounterRepo.DidNotReceive().NextValueAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MixedRfbaItems_RejectsBeforeUpdatingPurchaseOrder()
+    {
+        var items = new List<BudgetPlanItem>
+        {
+            new()
+            {
+                Id = 101,
+                BudgetPlanId = 5,
+                VendorShadowId = 22,
+                IsRfba = true,
+                ItemShadowId = 11,
+                Item = new ItemShadow { Id = 11, ItemCode = "ITEM-A", ItemName = "Item A", AcctCode = "ACC-01", AcctName = "Account" },
+                Vendor = new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" },
+                UomMasterId = 33,
+                Uom = new UomMaster { Id = 33, Code = "PCS", Name = "Pieces" },
+                BudgetPlan = new BudgetPlan { Id = 5, Code = "BP-001" },
+            },
+            new()
+            {
+                Id = 102,
+                BudgetPlanId = 5,
+                VendorShadowId = 22,
+                IsRfba = false,
+                ItemShadowId = 12,
+                Item = new ItemShadow { Id = 12, ItemCode = "ITEM-B", ItemName = "Item B", AcctCode = "ACC-02", AcctName = "Account" },
+                Vendor = new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" },
+                UomMasterId = 33,
+                Uom = new UomMaster { Id = 33, Code = "PCS", Name = "Pieces" },
+                BudgetPlan = new BudgetPlan { Id = 5, Code = "BP-001" },
+            },
+        };
+        var draft = new PurchaseOrder
+        {
+            Id = 77,
+            VendorShadowId = 22,
+            Vendor = new VendorShadow { Id = 22, CardCode = "V-01", CardName = "Vendor Alpha" },
+            CreatedBy = new User { Fullname = "Creator" },
+            Status = PurchaseOrderStatus.Draft,
+            Items = [],
+        };
+
+        var readCount = 0;
+        _poRepo.GetByIdWithItemsAsync(77, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                readCount++;
+                if (readCount == 1) return draft;
+
+                return new PurchaseOrder
+                {
+                    Id = 77,
+                    Code = "PO-0077",
+                    VendorShadowId = 22,
+                    Vendor = draft.Vendor,
+                    CreatedBy = draft.CreatedBy,
+                    Status = PurchaseOrderStatus.Draft,
+                    Items = items.Select((item, index) => new PurchaseOrderItem
+                    {
+                        Id = index + 1,
+                        BudgetPlanItemId = item.Id,
+                        BudgetPlanItem = item,
+                        ItemCode = item.Item.ItemCode,
+                        ItemName = item.Item.ItemName,
+                        CoaCode = item.Item.AcctCode,
+                        CoaName = item.Item.AcctName,
+                        VendorShadowId = item.VendorShadowId,
+                        VendorCode = item.Vendor.CardCode,
+                        VendorName = item.Vendor.CardName,
+                        UomMasterId = item.UomMasterId,
+                        UomCode = item.Uom.Code,
+                        UomName = item.Uom.Name,
+                        IsRfba = item.IsRfba,
+                        CostValue = item.CostValue,
+                        Quantity = item.Quantity,
+                        TotalValue = item.TotalValue,
+                        SortOrder = index + 1,
+                        GrandTotal = item.GrandTotal,
+                    }).ToList(),
+                };
+            });
+        _poRepo.GetAvailableItemsAsync(
+                22,
+                Arg.Any<List<long>>(),
+                77L,
+                Arg.Any<List<long>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(items);
+        _uow.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+
+        var act = () => CreateSut().UpdateAsync(
+            77,
+            7,
+            new UpdatePurchaseOrderRequest("remark", null, [101, 102]),
+            TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.MixedRfbaItemsNotAllowed);
+        await _poRepo.DidNotReceive().UpdateAsync(
+            Arg.Any<PurchaseOrder>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -1125,6 +1550,41 @@ public class PurchaseOrderServiceTests
             DocDate = DateTime.UtcNow, CreatedAt = DateTime.UtcNow,
             Items = [poItem],
         };
+    }
+
+    [Fact]
+    public async Task GenerateAsync_MixedRfbaItems_RejectsBeforeCallingSapAndReleasesClaim()
+    {
+        var po = CreateGeneratablePo();
+        var firstItem = po.Items.First();
+        po.Items.Add(new PurchaseOrderItem
+        {
+            Id = 2L,
+            PurchaseOrderId = po.Id,
+            BudgetPlanItemId = 2L,
+            BudgetPlanItem = firstItem.BudgetPlanItem,
+            IsRfba = true,
+            ItemCode = "ITEM-B",
+            ItemName = "Item Beta",
+            VendorCode = "V-001",
+            VendorName = "Vendor One",
+            Quantity = 1m,
+            CostValue = 100m,
+            TotalValue = 100m,
+            SortOrder = 2,
+        });
+        _poRepo.GetByIdWithItemsAsync(99L, Arg.Any<CancellationToken>()).Returns(po);
+        _poRepo.TryClaimForGenerationAsync(99L, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var act = () => CreateSut().GenerateAsync(99L, 7L, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage(ErrorMessages.PurchaseOrder.MixedRfbaItemsNotAllowed);
+        await _sapClient.DidNotReceive().CreatePurchaseOrderAsync(
+            Arg.Any<SapCreatePoRequest>(), Arg.Any<CancellationToken>());
+        await _poRepo.Received(1).ReleaseGenerationClaimAsync(
+            99L, Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

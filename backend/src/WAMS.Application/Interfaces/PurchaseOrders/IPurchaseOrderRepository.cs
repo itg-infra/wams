@@ -22,12 +22,16 @@ public interface IPurchaseOrderRepository
     /// SAP DocEntry + 0-based line index (SortOrder - 1) per BudgetPlanItemId with a Generated PO
     /// line, for populating baseEntry/baseLine on AP Invoice/APDP creation.
     /// </summary>
-    Task<Dictionary<long, (int SapDocEntry, int LineIndex)>> GetGeneratedPoLineRefsAsync(List<long> budgetPlanItemIds, CancellationToken ct = default);
+    Task<Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)>> GetGeneratedPoLineRefsAsync(List<long> budgetPlanItemIds, CancellationToken ct = default);
     Task CreateAsync(PurchaseOrder po, CancellationToken ct = default);
     Task UpdateAsync(PurchaseOrder po, CancellationToken ct = default);
     Task<bool> MarkGeneratedAsync(long id, string claimToken, string sapPoNumber, int? sapDocEntry, long generatedByUserId, CancellationToken ct = default);
     Task<bool> TryClaimForGenerationAsync(long id, string claimToken, CancellationToken ct = default);
     Task ReleaseGenerationClaimAsync(long id, string claimToken, CancellationToken ct = default);
+    Task<bool> TryClaimForApdpGenerationAsync(long id, string claimToken, CancellationToken ct = default);
+    Task<bool> MarkApdpGeneratedAsync(long id, string claimToken, int sapDocEntry, CancellationToken ct = default);
+    Task RecordApdpFailureAsync(long id, string claimToken, string error, CancellationToken ct = default);
+    Task ReleaseApdpGenerationClaimAsync(long id, string claimToken, CancellationToken ct = default);
     Task<bool> LockForEditAsync(long id, CancellationToken ct = default);
     Task<bool> SoftDeleteAsync(long id, CancellationToken ct = default);
 }

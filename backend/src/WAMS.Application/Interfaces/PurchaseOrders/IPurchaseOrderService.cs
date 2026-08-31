@@ -19,4 +19,5 @@ public interface IPurchaseOrderService
     Task<PurchaseOrderResponse> UpdateAsync(long id, long userId, UpdatePurchaseOrderRequest request, CancellationToken ct = default);
     Task DeleteAsync(long id, CancellationToken ct = default);
     Task<PurchaseOrderResponse> GenerateAsync(long id, long userId, CancellationToken ct = default);
+    Task<PurchaseOrderResponse> GenerateApdpAsync(long id, long userId, CancellationToken ct = default);
 }

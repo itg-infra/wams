@@ -19,6 +19,7 @@ using WAMS.Domain.Entities.Uoms;
 using WAMS.Domain.Entities.Users;
 using WAMS.Domain.Entities.Vendors;
 using WAMS.Domain.Entities.Warehouses;
+using WAMS.Domain.Exceptions;
 using Xunit;
 
 public class AccountPayableServiceTests
@@ -38,9 +39,9 @@ public class AccountPayableServiceTests
     {
         _apRepo.LockForEditAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(true);
         _apRepo.SoftDeleteAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(true);
-        _apRepo.MarkGeneratedAsync(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(true);
+        _apRepo.MarkGeneratedAsync(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<long, (int SapDocEntry, int LineIndex)>());
+            .Returns(new Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)>());
 
         // Default every test to "global access, no warehouse restriction" (null warehouseIds) unless
         // a test explicitly overrides warehouseContext/rbacService to exercise the restricted path.
@@ -50,6 +51,17 @@ public class AccountPayableServiceTests
 
     private AccountPayableService CreateSut() => new(
         _apRepo, _vendorRepo, _poRepo, _sapClient, _uow, _warehouseContext, _warehouseRepo, _userRepo, _rbacService, _codeCounterRepo);
+
+    private static Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)> DefaultGeneratedPoRefs() =>
+        new()
+        {
+            [0L] = (999, 0, 301),
+            [100L] = (999, 0, 301),
+            [101L] = (999, 1, 301),
+            [200L] = (999, 0, 301),
+            [300L] = (999, 0, 301),
+            [663L] = (999, 0, 301),
+        };
 
     [Fact]
     public async Task CreateAsync_WithoutItems_RejectsRequestBeforeLookupOrPersistence()
@@ -753,11 +765,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
 
         SapCreateApInvoiceRequest? captured = null;
         _sapClient.CreateApInvoiceAsync(Arg.Do<SapCreateApInvoiceRequest>(r => captured = r), Arg.Any<CancellationToken>())
@@ -769,8 +777,7 @@ public class AccountPayableServiceTests
 
         captured.Should().NotBeNull();
         captured!.WhTax.Should().ContainSingle(w => w.WtCode == "PPH23" && w.TaxableAmount == 250m);
-        captured.ApdpDocEntry.Should().BeNull();
-        captured.DrawAmount.Should().BeNull();
+        captured.Tapdp.Should().BeNull();
         captured.Items.First(i => i.ItemCode == "ITEM-A").PphTaxTypeCode.Should().Be("PPH23");
         captured.Items.First(i => i.ItemCode == "ITEM-B").PphTaxTypeCode.Should().Be("PPH23");
         captured.Items.First(i => i.ItemCode == "ITEM-C").PphTaxTypeCode.Should().BeNull();
@@ -779,7 +786,7 @@ public class AccountPayableServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_Rfba_CallsApdpThenInvoiceWithTapdpAndNoWhTax()
+    public async Task GenerateAsync_Rfba_UsesSourcePoApdpInTapdpAndNoWhTax()
     {
         var item = new AccountPayableItem
         {
@@ -793,14 +800,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
-        _sapClient.CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new SapCreateApdpResult(301));
-
+            .Returns(DefaultGeneratedPoRefs());
         SapCreateApInvoiceRequest? captured = null;
         _sapClient.CreateApInvoiceAsync(Arg.Do<SapCreateApInvoiceRequest>(r => captured = r), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9102", 401));
@@ -809,16 +809,79 @@ public class AccountPayableServiceTests
         var ct = TestContext.Current.CancellationToken;
         await sut.GenerateAsync(1L, userId: 1L, ct: ct);
 
-        await _sapClient.Received(1).CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
         captured.Should().NotBeNull();
-        captured!.ApdpDocEntry.Should().Be(301);
-        captured.DrawAmount.Should().Be(200m);
+        captured!.Tapdp.Should().ContainSingle(dp => dp.BaseEntryDp == 301 && dp.AmountToDraw == 200m);
         captured.WhTax.Should().BeNull();
-        ap.SapApdpDocEntry.Should().Be(301);
     }
 
     [Fact]
-    public async Task GenerateAsync_Rfba_ApdpAlreadySet_SkipsApdpCallOnRetry()
+    public async Task GenerateAsync_RfbaWithoutSourcePoApdp_RejectsBeforeCallingSap()
+    {
+        var item = new AccountPayableItem
+        {
+            Id = 1, BudgetPlanItemId = 100L, VendorCode = "V-01", ItemCode = "ITEM-A", CoaCode = "ACC-01", UomCode = "PCS",
+            UnitCost = 100m, UnitCount = 2m, BudgetPlanTotal = 200m, GrandTotal = 200m,
+            IsRfba = true,
+        };
+        var ap = BuildGeneratableAp(item);
+
+        _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
+        _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)>
+            {
+                [100L] = (999, 0, null),
+            });
+
+        var act = () => CreateSut().GenerateAsync(1L, 1L, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*require APDP generation*");
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
+        await _sapClient.DidNotReceive().CreateApInvoiceAsync(
+            Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateAsync_RfbaFromMultiplePurchaseOrders_SendsOneTapdpEntryPerSourceApdp()
+    {
+        var item1 = new AccountPayableItem
+        {
+            Id = 1, BudgetPlanItemId = 100L, VendorCode = "V-01", ItemCode = "ITEM-A", CoaCode = "ACC-01", UomCode = "PCS",
+            UnitCost = 100m, UnitCount = 1m, BudgetPlanTotal = 100m, GrandTotal = 100m,
+            IsRfba = true,
+        };
+        var item2 = new AccountPayableItem
+        {
+            Id = 2, BudgetPlanItemId = 101L, VendorCode = "V-01", ItemCode = "ITEM-B", CoaCode = "ACC-02", UomCode = "PCS",
+            UnitCost = 200m, UnitCount = 1m, BudgetPlanTotal = 200m, GrandTotal = 200m,
+            IsRfba = true,
+        };
+        var ap = BuildGeneratableAp(item1, item2);
+
+        _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
+        _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)>
+            {
+                [100L] = (999, 0, 301),
+                [101L] = (1000, 1, 302),
+            });
+        SapCreateApInvoiceRequest? captured = null;
+        _sapClient.CreateApInvoiceAsync(Arg.Do<SapCreateApInvoiceRequest>(request => captured = request), Arg.Any<CancellationToken>())
+            .Returns(new SapCreateApInvoiceResult("9108", 401));
+
+        await CreateSut().GenerateAsync(1L, 1L, TestContext.Current.CancellationToken);
+
+        captured.Should().NotBeNull();
+        captured!.Tapdp.Should().BeEquivalentTo(
+            [new SapApInvoiceDpLine(301, 100m), new SapApInvoiceDpLine(302, 200m)]);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_Rfba_SourcePoApdpAlreadySet_SkipsApdpCall()
     {
         var item = new AccountPayableItem
         {
@@ -827,16 +890,11 @@ public class AccountPayableServiceTests
             IsRfba = true,
         };
         var ap = BuildGeneratableAp(item);
-        ap.SapApdpDocEntry = 301; // simulates a prior partial failure: APDP succeeded, invoice call didn't
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9103", 402));
 
@@ -846,7 +904,12 @@ public class AccountPayableServiceTests
 
         await _sapClient.DidNotReceive().CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>());
         await _sapClient.Received(1).CreateApInvoiceAsync(
-            Arg.Is<SapCreateApInvoiceRequest>(r => r.ApdpDocEntry == 301), Arg.Any<CancellationToken>());
+            Arg.Is<SapCreateApInvoiceRequest>(r =>
+                r.Tapdp != null &&
+                r.Tapdp.Count == 1 &&
+                r.Tapdp[0].BaseEntryDp == 301 &&
+                r.Tapdp[0].AmountToDraw == 200m),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -870,11 +933,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("SAP-AP-001", 999));
 
@@ -902,11 +961,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("SAP-AP-001", 999));
 
@@ -920,7 +975,7 @@ public class AccountPayableServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_RfbaWithDiscount_DrawAmountNetsOutDiscount()
+    public async Task GenerateAsync_RfbaWithDiscount_TapdpAmountNetsOutDiscount()
     {
         var item = new AccountPayableItem
         {
@@ -930,16 +985,11 @@ public class AccountPayableServiceTests
         };
         var ap = BuildGeneratableAp(item);
         ap.DiscountAmount = 50m;
-        ap.SapApdpDocEntry = 777; // APDP already created, skip straight to invoice/draw
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("SAP-AP-001", 999));
 
@@ -948,7 +998,10 @@ public class AccountPayableServiceTests
         await sut.GenerateAsync(1L, userId: 1L, ct: ct);
 
         await _sapClient.Received(1).CreateApInvoiceAsync(
-            Arg.Is<SapCreateApInvoiceRequest>(r => r.DrawAmount == 450m), // 500 - 50
+            Arg.Is<SapCreateApInvoiceRequest>(r =>
+                r.Tapdp != null &&
+                r.Tapdp.Count == 1 &&
+                r.Tapdp[0].AmountToDraw == 450m), // 500 - 50
             Arg.Any<CancellationToken>());
     }
 
@@ -962,16 +1015,12 @@ public class AccountPayableServiceTests
             IsRfba = true,
         };
         var ap = BuildGeneratableAp(item);
-        ap.DiscountAmount = 50m; // SapApdpDocEntry left null so the APDP branch actually runs
+        ap.DiscountAmount = 50m;
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApdpResult(301));
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
@@ -981,8 +1030,15 @@ public class AccountPayableServiceTests
         var ct = TestContext.Current.CancellationToken;
         await sut.GenerateAsync(1L, userId: 1L, ct: ct);
 
-        await _sapClient.Received(1).CreateApDownPaymentAsync(
-            Arg.Is<SapCreateApdpRequest>(r => r.Items.All(i => i.DiscountPercent == 10m)), // 50 / 500 * 100
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(),
+            Arg.Any<CancellationToken>());
+        await _sapClient.Received(1).CreateApInvoiceAsync(
+            Arg.Is<SapCreateApInvoiceRequest>(r =>
+                r.Items.All(i => i.DiscountPercent == 10m) &&
+                r.Tapdp != null &&
+                r.Tapdp.Count == 1 &&
+                r.Tapdp[0].AmountToDraw == 450m),
             Arg.Any<CancellationToken>());
     }
 
@@ -1006,11 +1062,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApDownPaymentAsync(Arg.Any<SapCreateApdpRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApdpResult(555));
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
@@ -1020,13 +1072,17 @@ public class AccountPayableServiceTests
         var ct = TestContext.Current.CancellationToken;
         await sut.GenerateAsync(1L, userId: 1L, ct: ct);
 
-        await _sapClient.Received(1).CreateApDownPaymentAsync(
-            Arg.Is<SapCreateApdpRequest>(r => r.Items.Count == 1 && r.Items[0].ItemCode == "RFBA-A"),
+        await _sapClient.DidNotReceive().CreateApDownPaymentAsync(
+            Arg.Any<SapCreateApdpRequest>(),
+            Arg.Any<CancellationToken>());
+        await _sapClient.Received(1).CreateApInvoiceAsync(
+            Arg.Is<SapCreateApInvoiceRequest>(r =>
+                r.Tapdp != null && r.Tapdp.Count == 1 && r.Tapdp[0].BaseEntryDp == 301 && r.Items.Count == 2),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task GenerateAsync_Mixed_DrawAmountIsRfbaSubsetNetOfItsProportionalDiscountShare()
+    public async Task GenerateAsync_Mixed_TapdpAmountIsRfbaSubsetNetOfItsProportionalDiscountShare()
     {
         var rfbaItem = new AccountPayableItem
         {
@@ -1042,16 +1098,11 @@ public class AccountPayableServiceTests
         };
         var ap = BuildGeneratableAp(rfbaItem, nonRfbaItem);
         ap.DiscountAmount = 50m; // DppTotal = 500, RFBA share = 50 * 300/500 = 30
-        ap.SapApdpDocEntry = 555; // already created, skip straight to invoice/draw
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9106", 401));
 
@@ -1059,10 +1110,13 @@ public class AccountPayableServiceTests
         var ct = TestContext.Current.CancellationToken;
         await sut.GenerateAsync(1L, userId: 1L, ct: ct);
 
-        // DrawAmount = 300 - 30 = 270 (RFBA subset, net of its proportional discount share -
-        // PM confirmed discount applies to both RFBA and non-RFBA when mixed)
+        // The RFBA draw is 300 - 30 = 270 (RFBA subset, net of its proportional discount share -
+        // PM confirmed discount applies to both RFBA and non-RFBA when mixed).
         await _sapClient.Received(1).CreateApInvoiceAsync(
-            Arg.Is<SapCreateApInvoiceRequest>(r => r.DrawAmount == 270m),
+            Arg.Is<SapCreateApInvoiceRequest>(r =>
+                r.Tapdp != null &&
+                r.Tapdp.Count == 1 &&
+                r.Tapdp[0].AmountToDraw == 270m),
             Arg.Any<CancellationToken>());
     }
 
@@ -1082,16 +1136,11 @@ public class AccountPayableServiceTests
             IsRfba = false, PphTaxTypeCode = "PPH23", PphRate = 2m, PphAmount = 2m,
         };
         var ap = BuildGeneratableAp(rfbaItem, nonRfbaItem);
-        ap.SapApdpDocEntry = 555;
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9107", 401));
 
@@ -1122,16 +1171,11 @@ public class AccountPayableServiceTests
         };
         var ap = BuildGeneratableAp(rfbaItem, nonRfbaItem);
         ap.DiscountAmount = 50m; // 50 / 500 (whole document DPP) * 100 = 10%, same for every line
-        ap.SapApdpDocEntry = 555;
 
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9108", 401));
 
@@ -1182,11 +1226,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns<SapCreateApInvoiceResult?>(_ => throw new WAMS.Domain.Exceptions.ValidationException("SAP rejected"));
 
@@ -1212,14 +1252,10 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ids = ci.Arg<List<long>>();
-                return ids.Distinct().ToDictionary(id => id, id => (999, 0));
-            });
+            .Returns(DefaultGeneratedPoRefs());
         _sapClient.CreateApInvoiceAsync(Arg.Any<SapCreateApInvoiceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new SapCreateApInvoiceResult("9101", 401));
-        _apRepo.MarkGeneratedAsync(1L, Arg.Any<string>(), "9101", 401, Arg.Any<int?>(), 1L, Arg.Any<CancellationToken>())
+        _apRepo.MarkGeneratedAsync(1L, Arg.Any<string>(), "9101", 401, 1L, Arg.Any<CancellationToken>())
             .Returns(false);
 
         var sut = CreateSut();
@@ -1400,7 +1436,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<long, (int, int)>());
+            .Returns(new Dictionary<long, (int, int, int?)>());
 
         var sut = CreateSut();
         var act = () => sut.GenerateAsync(1L, userId: 1L, ct: TestContext.Current.CancellationToken);
@@ -1432,7 +1468,7 @@ public class AccountPayableServiceTests
         _apRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(ap);
         _apRepo.TryClaimForGenerationAsync(1L, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<long, (int, int)> { [100L] = (501, 0) });
+            .Returns(new Dictionary<long, (int, int, int?)> { [100L] = (501, 0, null) });
 
         var sut = CreateSut();
         var act = () => sut.GenerateAsync(1L, userId: 1L, ct: TestContext.Current.CancellationToken);
@@ -1474,7 +1510,7 @@ public class AccountPayableServiceTests
             .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
 
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<long, (int, int)>());
+            .Returns(new Dictionary<long, (int, int, int?)>());
 
         var sut = CreateSut();
         var result = await sut.CreateAsync(1L, new CreateAccountPayableRequest(22, null, DateTime.UtcNow, [100]),
@@ -1517,7 +1553,7 @@ public class AccountPayableServiceTests
             .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
 
         _poRepo.GetGeneratedPoLineRefsAsync(Arg.Any<List<long>>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<long, (int, int)> { [100L] = (501, 0) });
+            .Returns(new Dictionary<long, (int, int, int?)> { [100L] = (501, 0, null) });
 
         var sut = CreateSut();
         var result = await sut.CreateAsync(1L, new CreateAccountPayableRequest(22, null, DateTime.UtcNow, [100]),

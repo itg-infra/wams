@@ -215,9 +215,9 @@ public class SapApiClient(
             DocCurrency: docCurrency,
             Lines: lines,
             WhTax: request.WhTax?.Select(w => new SapWhTaxDto(w.WtCode, (double)w.TaxableAmount)).ToList() ?? [],
-            Tapdp: request.ApdpDocEntry is int apdpDocEntry
-                ? [new SapApInvoiceDpDto(apdpDocEntry, (double)(request.DrawAmount ?? 0m))]
-                : []);
+            Tapdp: request.Tapdp?
+                .Select(dp => new SapApInvoiceDpDto(dp.BaseEntryDp, (double)dp.AmountToDraw))
+                .ToList() ?? []);
 
         var url = $"/WAMS/APInvoice?Entity={Uri.EscapeDataString(entity)}";
         var body = await PostAndReadBodyAsync(url, dto, request.ApCode, "CreateApInvoiceAsync", ct);

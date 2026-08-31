@@ -352,15 +352,14 @@ public class SapApiClientTests
         Items: [MakeLineItem("ITEM-A", "ACC-01", 10m, 1000m, 10000m)]);
 
     private static SapCreateApInvoiceRequest CreateApInvoiceRequest(
-        List<SapWhTaxLine>? whTax = null, int? apdpDocEntry = null, decimal? drawAmount = null) => new(
+        List<SapWhTaxLine>? whTax = null, List<SapApInvoiceDpLine>? tapdp = null) => new(
         ApCode: "AP-001",
         VendorCode: "V-001",
         DocDate: new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc),
         Remark: "test remark",
         Items: [MakeLineItem("ITEM-A", "ACC-01", 10m, 1000m, 10000m)],
         WhTax: whTax,
-        ApdpDocEntry: apdpDocEntry,
-        DrawAmount: drawAmount);
+        Tapdp: tapdp);
 
     [Fact]
     public async Task CreateApDownPaymentAsync_ResolvesProductAndDivisionOnly()
@@ -399,8 +398,7 @@ public class SapApiClientTests
             Remark: "test remark",
             Items: [MakeLineItem("ITEM-A", "ACC-01", 10m, 1000m, 10000m, skuItemCode: "SKU-A")],
             WhTax: null,
-            ApdpDocEntry: null,
-            DrawAmount: null);
+            Tapdp: null);
 
         await sut.CreateApInvoiceAsync(request, TestContext.Current.CancellationToken);
 
@@ -498,11 +496,34 @@ public class SapApiClientTests
     }
 
     [Fact]
+    public async Task CreateApInvoiceAsync_MultipleTapdp_SerializesEveryDownPaymentReference()
+    {
+        var sut = CreateSut(HttpStatusCode.OK, """{"docEntry": 401, "docNum": 9101}""", out var handler);
+
+        await sut.CreateApInvoiceAsync(
+            CreateApInvoiceRequest(tapdp:
+            [
+                new SapApInvoiceDpLine(301, 10000m),
+                new SapApInvoiceDpLine(302, 20000m),
+            ]),
+            TestContext.Current.CancellationToken);
+
+        using var json = JsonDocument.Parse(handler.LastRequestBody!);
+        var tapdp = json.RootElement.GetProperty("tapdp").EnumerateArray().ToList();
+        tapdp.Should().HaveCount(2);
+        tapdp[0].GetProperty("baseEntryDP").GetInt32().Should().Be(301);
+        tapdp[0].GetProperty("amountToDraw").GetDouble().Should().Be(10000d);
+        tapdp[1].GetProperty("baseEntryDP").GetInt32().Should().Be(302);
+        tapdp[1].GetProperty("amountToDraw").GetDouble().Should().Be(20000d);
+    }
+
+    [Fact]
     public async Task CreateApInvoiceAsync_NonSuccessStatus_ThrowsWithSapErrorBody()
     {
         var sut = CreateSut(HttpStatusCode.BadRequest, """{"error": "TaxCode: required"}""");
 
-        var act = () => sut.CreateApInvoiceAsync(CreateApInvoiceRequest(apdpDocEntry: 301, drawAmount: 10000m));
+        var act = () => sut.CreateApInvoiceAsync(CreateApInvoiceRequest(
+            tapdp: [new SapApInvoiceDpLine(301, 10000m)]));
 
         var ex = await act.Should().ThrowAsync<ValidationException>();
         ex.Which.Message.Should().Contain("TaxCode: required");

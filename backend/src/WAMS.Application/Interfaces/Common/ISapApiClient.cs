@@ -78,7 +78,8 @@ public record SapCreateApInvoiceRequest(
     string? Remark,
     List<SapApLineItem> Items,
     List<SapWhTaxLine>? WhTax,
-    int? ApdpDocEntry,
-    decimal? DrawAmount);
+    List<SapApInvoiceDpLine>? Tapdp);
+
+public record SapApInvoiceDpLine(int BaseEntryDp, decimal AmountToDraw);
 
 public record SapCreateApInvoiceResult(string SapApNumber, int SapDocEntry);

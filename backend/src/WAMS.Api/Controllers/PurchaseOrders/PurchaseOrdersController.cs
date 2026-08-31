@@ -272,6 +272,19 @@ public class PurchaseOrdersController(
         ));
     }
 
+    /// <summary>Generates the standalone SAP APDP for the RFBA lines of a generated PO.</summary>
+    [HttpPost("{id:long}/generate-apdp")]
+    [RequirePermission(Permissions.Budget.PoGenerate)]
+    [ProducesResponseType(typeof(ApiResponse<PurchaseOrderResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GenerateApdp(long id, CancellationToken ct)
+    {
+        var result = await poService.GenerateApdpAsync(id, GetUserId(), ct);
+
+        return Ok(OkResponse(result, SuccessMessages.PurchaseOrder.ApdpGenerated));
+    }
+
     /// <summary>Exports purchase orders matching the given query.</summary>
     [HttpGet("export")]
     [RequirePermission(Permissions.Budget.PoExport)]

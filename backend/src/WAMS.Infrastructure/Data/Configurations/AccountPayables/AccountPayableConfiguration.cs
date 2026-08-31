@@ -24,7 +24,6 @@ public class AccountPayableConfiguration : IEntityTypeConfiguration<AccountPayab
             .HasMaxLength(20)
             .HasConversion(v => v.Value, s => AccountPayableStatus.FromValue(s));
         builder.Property(a => a.SapApNumber).HasColumnName("sap_ap_number").HasMaxLength(100);
-        builder.Property(a => a.SapApdpDocEntry).HasColumnName("sap_apdp_doc_entry");
         builder.Property(a => a.SapDocEntry).HasColumnName("sap_doc_entry");
         builder.Property(a => a.GenerationClaimedAt).HasColumnName("generation_claimed_at");
         builder.Property(a => a.GenerationClaimToken).HasColumnName("generation_claim_token").HasMaxLength(64);

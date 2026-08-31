@@ -237,7 +237,7 @@ public class PurchaseOrderRepository(
         }
     }
 
-    public async Task<Dictionary<long, (int SapDocEntry, int LineIndex)>> GetGeneratedPoLineRefsAsync(
+    public async Task<Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)>> GetGeneratedPoLineRefsAsync(
         List<long> budgetPlanItemIds,
         CancellationToken ct = default
     )
@@ -252,6 +252,7 @@ public class PurchaseOrderRepository(
                 poi.BudgetPlanItemId,
                 SapDocEntry = poi.PurchaseOrder.SapDocEntry!.Value,
                 LineIndex = poi.SortOrder - 1,
+                SapApdpDocEntry = poi.PurchaseOrder.SapApdpDocEntry,
             })
             .ToListAsync(ct);
 
@@ -261,7 +262,8 @@ public class PurchaseOrderRepository(
             .GroupBy(x => x.BudgetPlanItemId)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(x => x.SapDocEntry).Select(x => (x.SapDocEntry, x.LineIndex)).First());
+                g => g.OrderByDescending(x => x.SapDocEntry)
+                    .Select(x => (x.SapDocEntry, x.LineIndex, x.SapApdpDocEntry)).First());
     }
 
     public async Task<PurchaseOrder?> GetByIdWithItemsAsync(long id, CancellationToken ct = default)
@@ -1240,6 +1242,59 @@ public class PurchaseOrderRepository(
             UPDATE purchase_orders
             SET generation_claimed_at = NULL, generation_claim_token = NULL
             WHERE "Id" = {id} AND generation_claim_token = {claimToken}
+            """, ct);
+
+    public async Task<bool> TryClaimForApdpGenerationAsync(long id, string claimToken, CancellationToken ct = default)
+    {
+        var rows = await db.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE purchase_orders
+            SET apdp_generation_claimed_at = NOW(), apdp_generation_claim_token = {claimToken},
+                sap_apdp_error = NULL, updated_at = NOW()
+            WHERE "Id" = {id}
+              AND status = 'Generated'
+              AND sap_doc_entry IS NOT NULL
+              AND deleted_at IS NULL
+              AND (sap_apdp_doc_entry IS NULL)
+              AND (apdp_generation_claimed_at IS NULL OR apdp_generation_claimed_at < NOW() - INTERVAL '15 minutes')
+            """, ct);
+        return rows == 1;
+    }
+
+    public async Task<bool> MarkApdpGeneratedAsync(long id, string claimToken, int sapDocEntry, CancellationToken ct = default)
+    {
+        var rows = await db.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE purchase_orders
+            SET sap_apdp_doc_entry = {sapDocEntry},
+                sap_apdp_generated_at = NOW(),
+                sap_apdp_error = NULL,
+                apdp_generation_claimed_at = NULL,
+                apdp_generation_claim_token = NULL,
+                updated_at = NOW()
+            WHERE "Id" = {id}
+              AND apdp_generation_claim_token = {claimToken}
+              AND sap_apdp_doc_entry IS NULL
+              AND deleted_at IS NULL
+            """, ct);
+        return rows == 1;
+    }
+
+    public async Task RecordApdpFailureAsync(long id, string claimToken, string error, CancellationToken ct = default)
+        => await db.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE purchase_orders
+            SET sap_apdp_error = {error}, updated_at = NOW()
+            WHERE "Id" = {id} AND apdp_generation_claim_token = {claimToken} AND deleted_at IS NULL
+            """, ct);
+
+    public async Task ReleaseApdpGenerationClaimAsync(long id, string claimToken, CancellationToken ct = default)
+        => await db.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE purchase_orders
+            SET apdp_generation_claimed_at = NULL, apdp_generation_claim_token = NULL,
+                updated_at = NOW()
+            WHERE "Id" = {id} AND apdp_generation_claim_token = {claimToken}
             """, ct);
 
     public async Task<bool> LockForEditAsync(long id, CancellationToken ct = default)

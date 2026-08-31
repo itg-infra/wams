@@ -118,6 +118,7 @@ public static class SuccessMessages
         public const string CreatedAndGenerated = "Purchase order created and generated";
         public const string Updated = "Purchase order updated";
         public const string Generated = "Purchase order generated";
+        public const string ApdpGenerated = "Purchase order APDP generated";
         public const string RecapListRetrieved = "Purchase order recap list retrieved";
         public const string RecapRetrieved = "Purchase order recap retrieved";
     }

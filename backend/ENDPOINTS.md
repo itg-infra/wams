@@ -2269,7 +2269,7 @@ Only `Draft` POs can be updated or deleted. Once `Generated`, the PO and its ite
 
 ### Recap Purchase Order (APDP / Non-APDP)
 
-Two report views over the same PO data, split by `PurchaseOrderItem.IsRfba`: **APDP** = `IsRfba == true`, **Non-APDP** = `IsRfba == false`. "APDP" = AP Down Payment (a SAP Business One document type) - here it is purely this boolean flag, not yet integrated with the real `/WAMS/APDP` SAP endpoint.
+Two report views over the same PO data, split by `PurchaseOrderItem.IsRfba`: **APDP** = `IsRfba == true`, **Non-APDP** = `IsRfba == false`. "APDP" = AP Down Payment, a SAP Business One document type. Generated RFBA POs can create their standalone SAP APDP through `POST /api/v1/purchase-orders/{id}/generate-apdp`; the resulting document entry is stored on the PO.
 
 | Method | Path | Permission | Description |
 |--------|------|------------|-------------|
@@ -3824,7 +3824,7 @@ All totals that involve the discount are computed server-side by one function, `
 
 - `AccountPayableResponse` (persisted AP, see below) - `discountAmount`, `discountPercent`, `totalRealization`, `totalVariance` are new fields; `taxInclusiveGrandTotal`'s value now nets out the discount.
 - `POST /api/v1/account-payables/preview` (below) - the same totals, computed live from a not-yet-saved item selection + discount amount, with nothing persisted.
-- SAP posting (`POST .../generate`, below) - the nominal amount is converted to a single `discountPercent` (`discountAmount / dppTotal * 100`) applied identically to every line item, on both the APDP and Invoice documents when `isRfba=true`. This is the exact same percentage shown to the user, not a re-derived one - so what's displayed always matches what SAP receives.
+- SAP posting (`POST .../generate`, below) - the nominal amount is converted to a single `discountPercent` (`discountAmount / dppTotal * 100`) applied identically to every AP Invoice line item. RFBA APDP documents are generated separately from their source POs.
 
 **Validation:** `discountAmount` must be `>= 0` and `<= dppTotal` (sum of the AP's `items[].budgetPlanTotal`) - enforced on Create/Update, `400 Bad Request` otherwise. `POST /preview` does **not** enforce this bound; a preview showing a negative total is a deliberate live signal to the user that the discount is too large, not an error. Preview item lookup still enforces the caller's warehouse scope.
 
@@ -3864,20 +3864,38 @@ No `id`/`code`/`status`/`sapApNumber`/`createdAt` - nothing has been saved yet, 
 
 ### `POST /api/v1/account-payables/{id}/generate`
 
-Sends the AP to SAP and transitions status to `Generated`. Items become immutable after this call. All items on one AP share a single `isRfba` value (enforced at create/update time - see below), which determines the SAP call sequence:
+Sends the AP Invoice to SAP and transitions status to `Generated`. Items become immutable after this call. All items on one AP share a single `isRfba` value (enforced at create/update time - see below). APDP is never created by this endpoint; RFBA items must already belong to a generated PO whose standalone APDP has succeeded.
 
 - **`isRfba=false`**: one call, `POST /WAMS/APInvoice`. `whTax` is built by grouping items with a non-null `pphTaxTypeCode` by that code, summing each group's `budgetPlanTotal` into a single `{wtCode, taxableAmount}` entry per code - not sent per line.
-- **`isRfba=true`**: two calls in sequence. First `POST /WAMS/APDP` - the returned doc entry is persisted to `sapApdpDocEntry` immediately (its own commit, before the invoice call), so a failed/retried Generate never re-creates a duplicate down-payment document in SAP. Then `POST /WAMS/APInvoice`, drawing down the AP total (net of `discountAmount`) via `tapdp` (`{baseEntryDP, amountToDraw}`); `whTax` is omitted entirely on this path, even if individual lines have a `pphTaxTypeCode`.
+- **`isRfba=true`**: one call, `POST /WAMS/APInvoice`. The persisted APDP document entry for each source PO is sent through `tapdp` (`{baseEntryDP, amountToDraw}`); `whTax` is omitted entirely on this path, even if individual lines have a `pphTaxTypeCode`. If an RFBA source PO has no APDP, the request is rejected before SAP is called.
 
-If `discountAmount > 0`, every line item on **both** SAP documents (APDP and Invoice, when applicable) carries the same `discountPercent` (`discountAmount / dppTotal * 100`) - see [Discount](#discount) above. When `discountAmount = 0`, `discountPercent` is omitted from the SAP payload entirely (not sent as `0`).
+If `discountAmount > 0`, every invoice line carries the same `discountPercent` (`discountAmount / dppTotal * 100`) - see [Discount](#discount) above. When `discountAmount = 0`, `discountPercent` is omitted from the SAP payload entirely (not sent as `0`).
 
-On success, `sapApNumber` is stored and returned in the response. The numeric SAP doc entries (`sapApdpDocEntry`, `sapDocEntry`) are persisted on the AP record for internal resumability tracking only - they are not part of the API response shape.
+On success, `sapApNumber` and `sapDocEntry` are stored and `sapApNumber` is returned in the response. APDP references are stored on each source PO and sent through `tapdp`. SAP doc entries are not part of the AP API response shape.
 
 > **Every item must have a Generated PO.** Before calling SAP, the AP's `BudgetPlanItem`s are checked against generated Purchase Order lines (`IPurchaseOrderRepository.GetGeneratedPoLineRefsAsync`). If any item has no matching Generated PO line, the whole Generate call is rejected with `400 Bad Request` (`ItemsMissingGeneratedPo` - same message as the Create/Update `warnings` field above, but blocking here instead of advisory).
 
 **Response:** `AccountPayableResponse` with `status: "Generated"` and `sapApNumber` populated.
 
 > **Mixed `isRfba` is rejected.** `POST /account-payables`, `POST /account-payables/{id}/generate` (via create), and `PUT /account-payables/{id}` all reject a request whose selected items resolve to more than one distinct `isRfba` value - `400 Bad Request`. Split into two APs instead.
+
+### `POST /api/v1/purchase-orders/{id}/generate-apdp`
+
+Generates the standalone SAP APDP for all RFBA lines in one generated purchase order. It requires a generated PO with a SAP PO reference, calls `POST /WAMS/APDP` only, and stores the returned document entry on the PO. A repeated request returns the existing APDP state without creating another SAP document. Failed requests retain a retryable failure state.
+
+The response is the purchase-order detail shape with an `apdp` object:
+
+```json
+{
+  "status": "Generated",
+  "sapDocEntry": 801,
+  "amount": 200000.00,
+  "generatedAt": "2026-08-31T12:00:00Z",
+  "error": null
+}
+```
+
+`apdp.status` is one of `PendingPo`, `NotRequired`, `Required`, `Processing`, `Generated`, or `Failed`.
 
 ### AP Detail Response Shape
 
@@ -3961,8 +3979,8 @@ On success, `sapApNumber` is stored and returned in the response. The numeric SA
 ### SAP Integration Toggle
 
 Same toggle as PO - `ErpApi:UseMockSap` in `appsettings.json`:
-- `true` (default): `MockSapApiClient` - returns `SAP-AP-{guid}` and fake doc entries for both the APDP and Invoice calls
-- `false`: `SapApiClient` - real HTTP calls to `POST /WAMS/APDP` and/or `POST /WAMS/APInvoice` (see `POST /api/v1/account-payables/{id}/generate` above for the `isRfba`-driven call sequence)
+- `true` (default): `MockSapApiClient` - returns fake doc entries for PO APDP and AP Invoice calls
+- `false`: `SapApiClient` - real HTTP calls to `POST /WAMS/APDP` and/or `POST /WAMS/APInvoice` (see the PO APDP and AP Generate sections above for the call sequence)
 
 ### AP Code Format
 

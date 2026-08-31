@@ -637,7 +637,6 @@ public class AccountPayableRepository(
         string claimToken,
         string sapApNumber,
         int? sapDocEntry,
-        int? sapApdpDocEntry,
         long generatedByUserId,
         CancellationToken ct = default)
     {
@@ -647,7 +646,6 @@ public class AccountPayableRepository(
             SET status = 'Generated',
                 sap_ap_number = {sapApNumber},
                 sap_doc_entry = {sapDocEntry},
-                sap_apdp_doc_entry = {sapApdpDocEntry},
                 generated_by_user_id = {generatedByUserId},
                 generated_at = NOW(),
                 generation_claimed_at = NULL,

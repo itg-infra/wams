@@ -246,10 +246,7 @@ public class AccountPayableService(
         }
         catch
         {
-            var current = await apRepo.GetByIdWithItemsAsync(created.Id, CancellationToken.None);
-
-            if (current?.SapApdpDocEntry is null)
-                await apRepo.SoftDeleteAsync(created.Id, CancellationToken.None);
+            await apRepo.SoftDeleteAsync(created.Id, CancellationToken.None);
 
             throw;
         }
@@ -394,33 +391,29 @@ public class AccountPayableService(
             throw new ValidationException(
                 ErrorMessages.AccountPayable.ItemsMissingGeneratedPo(itemsWithoutPo));
 
-        if (rfbaItems.Count > 0 && ap.SapApdpDocEntry is null)
-        {
-            var apdpRequest = new SapCreateApdpRequest(
-                ap.Code,
-                ap.Items.First().VendorCode,
-                ap.DocDate,
-                ap.Remark,
-                [.. rfbaItems.Select(i => ToSapApLineItem(i, discountPercent, poLineRefs))]
-            );
+        var rfbaWithoutApdp = rfbaItems
+            .Where(i => !poLineRefs.TryGetValue(i.BudgetPlanItemId, out var poRef) || poRef.SapApdpDocEntry is null)
+            .Select(i => i.BudgetPlanItemId)
+            .ToList();
 
-            var apdpResult = await sapClient.CreateApDownPaymentAsync(apdpRequest, ct)
-                ?? throw new ValidationException(ErrorMessages.AccountPayable.SapNoApNumber);
+        if (rfbaWithoutApdp.Count > 0)
+            throw new ValidationException(ErrorMessages.PurchaseOrder.ApdpRequiredBeforeInvoice(rfbaWithoutApdp));
 
-            ap.SapApdpDocEntry = apdpResult.SapDocEntry;
-            ap.UpdatedAt = DateTime.UtcNow;
-
-            await uow.CommitAsync(ct);
-        }
-
-        // DrawAmount = RFBA total minus its proportional share of the whole-document discount.
-        // PM applies the same discountPercent to both RFBA and non-RFBA lines when mixed.
-        // When pure-RFBA (rfbaDpp == totals.DppTotal), this equals totals.TaxInclusiveGrandTotal.
-        var rfbaDpp = rfbaItems.Sum(i => i.BudgetPlanTotal);
-        var rfbaDiscountShare = totals.DppTotal == 0m ? 0m : ap.DiscountAmount * rfbaDpp / totals.DppTotal;
-        var drawAmount = rfbaItems.Count == 0
-            ? (decimal?)null
-            : rfbaItems.Sum(i => i.GrandTotal) - rfbaDiscountShare;
+        // Each APDP draw amount is the RFBA total for its PO minus that PO's proportional
+        // share of the whole-document discount.
+        var tapdp = rfbaItems.Count == 0
+            ? null
+            : rfbaItems
+                .GroupBy(i => poLineRefs[i.BudgetPlanItemId].SapApdpDocEntry!.Value)
+                .Select(group =>
+                {
+                    var groupDpp = group.Sum(i => i.BudgetPlanTotal);
+                    var discountShare = totals.DppTotal == 0m ? 0m : ap.DiscountAmount * groupDpp / totals.DppTotal;
+                    return new SapApInvoiceDpLine(
+                        group.Key,
+                        group.Sum(i => i.GrandTotal) - discountShare);
+                })
+                .ToList();
 
         // Any RFBA presence suppresses WHT for the entire document
         var whTax = rfbaItems.Count > 0 ? null : BuildWhTaxLines(ap.Items);
@@ -432,8 +425,7 @@ public class AccountPayableService(
             ap.Remark,
             [.. ap.Items.Select(i => ToSapApLineItem(i, discountPercent, poLineRefs))],
             WhTax: whTax,
-            ApdpDocEntry: rfbaItems.Count > 0 ? ap.SapApdpDocEntry : null,
-            DrawAmount: drawAmount
+            Tapdp: tapdp
         );
 
         var invoiceResult = await sapClient.CreateApInvoiceAsync(invoiceRequest, ct)
@@ -444,7 +436,6 @@ public class AccountPayableService(
             claimToken,
             invoiceResult.SapApNumber,
             invoiceResult.SapDocEntry,
-            ap.SapApdpDocEntry,
             userId,
             ct);
 
@@ -473,10 +464,11 @@ public class AccountPayableService(
     private static SapApLineItem ToSapApLineItem(
         AccountPayableItem i,
         decimal? discountPercent,
-        Dictionary<long, (int SapDocEntry, int LineIndex)> poLineRefs
+        Dictionary<long, (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)> poLineRefs
     )
     {
-        (int SapDocEntry, int LineIndex)? poRef = poLineRefs.TryGetValue(i.BudgetPlanItemId, out var r) ? r : null;
+        (int SapDocEntry, int LineIndex, int? SapApdpDocEntry)? poRef =
+            poLineRefs.TryGetValue(i.BudgetPlanItemId, out var r) ? r : null;
 
         return new(
             i.ItemCode,

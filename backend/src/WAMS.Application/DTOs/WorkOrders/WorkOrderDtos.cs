@@ -34,6 +34,7 @@ public record BpActivityWoStatus(
     string ActivityName,
     string? ActivityTypeCode,
     string? ActivityTypeDisplay,
+    string? CoaName,
     long? WorkOrderId,
     string? WorkOrderCode,
     string? WorkOrderStatus);

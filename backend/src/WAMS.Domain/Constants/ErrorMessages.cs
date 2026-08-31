@@ -158,6 +158,14 @@ public static class ErrorMessages
         public const string CannotGenerateOnlyDraft = "Only Draft purchase orders can be generated";
         public const string NoItemsCannotGenerate = "Purchase order has no items and cannot be generated";
         public const string SapNoPoNumber = "SAP integration returned no PO number. Please try again.";
+        public const string CannotGenerateApdpOnlyGenerated = "APDP can only be generated after the purchase order is generated";
+        public const string NoRfbaItemsCannotGenerateApdp = "This purchase order has no RFBA items, so APDP is not required";
+        public const string MixedRfbaItemsNotAllowed = "RFBA Yes and RFBA No items cannot be generated in the same purchase order.";
+        public const string SapNoApdpDocument = "SAP integration returned no APDP document. Please try again.";
+        public static string ApdpGenerationInProgress(long id) =>
+            $"Another request is already generating APDP for purchase order {id}.";
+        public static string ApdpRequiredBeforeInvoice(IEnumerable<long> itemIds) =>
+            $"RFBA items {string.Join(", ", itemIds)} require APDP generation from their purchase order before generating the AP invoice.";
         public static string GenerationInProgress(long id) =>
             $"Another request is already generating purchase order {id}.";
         public static string ItemUnavailable(long itemId) =>

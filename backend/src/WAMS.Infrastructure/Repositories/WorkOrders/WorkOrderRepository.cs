@@ -607,6 +607,7 @@ public class WorkOrderRepository(
                 item."Id" AS item_shadow_id,
                 item.item_code,
                 item.item_name AS activity_name,
+                item.acct_name AS coa_name,
                 at_item.code AS item_activity_type_code,
                 at_item.name AS item_activity_type_display,
                 wo_ref.wo_id AS work_order_id,
@@ -673,6 +674,7 @@ public class WorkOrderRepository(
         var colItemShadowId = reader.GetOrdinal("item_shadow_id");
         var colItemCode = reader.GetOrdinal("item_code");
         var colActivityName = reader.GetOrdinal("activity_name");
+        var colCoaName = reader.GetOrdinal("coa_name");
         var colItemActivityTypeCode = reader.GetOrdinal("item_activity_type_code");
         var colItemActivityTypeDisplay = reader.GetOrdinal("item_activity_type_display");
         var colWorkOrderId = reader.GetOrdinal("work_order_id");
@@ -714,6 +716,7 @@ public class WorkOrderRepository(
                 reader.GetString(colActivityName),
                 reader.IsDBNull(colItemActivityTypeCode) ? null : reader.GetString(colItemActivityTypeCode),
                 reader.IsDBNull(colItemActivityTypeDisplay) ? null : reader.GetString(colItemActivityTypeDisplay),
+                reader.IsDBNull(colCoaName) ? null : reader.GetString(colCoaName),
                 reader.IsDBNull(colWorkOrderId) ? null : reader.GetInt64(colWorkOrderId),
                 reader.IsDBNull(colWorkOrderCode) ? null : reader.GetString(colWorkOrderCode),
                 reader.IsDBNull(colWorkOrderStatus) ? null : reader.GetString(colWorkOrderStatus)));

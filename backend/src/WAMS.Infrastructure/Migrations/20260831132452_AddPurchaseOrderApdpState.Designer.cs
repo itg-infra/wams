@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WAMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using WAMS.Infrastructure.Data;
 namespace WAMS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831132452_AddPurchaseOrderApdpState")]
+    partial class AddPurchaseOrderApdpState
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -88,6 +91,10 @@ namespace WAMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("sap_ap_number");
+
+                    b.Property<int?>("SapApdpDocEntry")
+                        .HasColumnType("integer")
+                        .HasColumnName("sap_apdp_doc_entry");
 
                     b.Property<int?>("SapDocEntry")
                         .HasColumnType("integer")

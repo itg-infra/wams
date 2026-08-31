@@ -6387,6 +6387,57 @@
         }
       }
     },
+    "/api/v1/purchase-orders/{id}/generate-apdp": {
+      "post": {
+        "tags": [
+          "PurchaseOrders"
+        ],
+        "summary": "Generates the standalone SAP APDP for RFBA lines in a generated purchase order.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderResponseApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/purchase-orders/{id}/generate": {
       "post": {
         "tags": [
@@ -13599,6 +13650,10 @@
             "type": "string",
             "nullable": true
           },
+          "coaName": {
+            "type": "string",
+            "nullable": true
+          },
           "workOrderId": {
             "type": "integer",
             "format": "int64",
@@ -16685,6 +16740,37 @@
             "nullable": true
           },
           "generatedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "apdp": {
+            "$ref": "#/components/schemas/PurchaseOrderApdpResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseOrderApdpResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "sapDocEntry": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "error": {
             "type": "string",
             "nullable": true
           }

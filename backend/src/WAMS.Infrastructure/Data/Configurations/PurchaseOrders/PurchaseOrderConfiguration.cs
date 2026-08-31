@@ -25,6 +25,11 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
             .HasConversion(v => v.Value, s => PurchaseOrderStatus.FromValue(s));
         builder.Property(p => p.SapPoNumber).HasColumnName("sap_po_number").HasMaxLength(100);
         builder.Property(p => p.SapDocEntry).HasColumnName("sap_doc_entry");
+        builder.Property(p => p.SapApdpDocEntry).HasColumnName("sap_apdp_doc_entry");
+        builder.Property(p => p.SapApdpGeneratedAt).HasColumnName("sap_apdp_generated_at");
+        builder.Property(p => p.SapApdpError).HasColumnName("sap_apdp_error").HasMaxLength(1000);
+        builder.Property(p => p.ApdpGenerationClaimedAt).HasColumnName("apdp_generation_claimed_at");
+        builder.Property(p => p.ApdpGenerationClaimToken).HasColumnName("apdp_generation_claim_token").HasMaxLength(64);
         builder.Property(p => p.GenerationClaimedAt).HasColumnName("generation_claimed_at");
         builder.Property(p => p.GenerationClaimToken).HasColumnName("generation_claim_token").HasMaxLength(64);
         builder.Property(p => p.CreatedByUserId).HasColumnName("created_by_user_id");

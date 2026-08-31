@@ -15,7 +15,6 @@ public class AccountPayable : BaseEntity
     public DateTime DocDate { get; set; }
     public AccountPayableStatus Status { get; set; } = AccountPayableStatus.Draft;
     public string? SapApNumber { get; set; }
-    public int? SapApdpDocEntry { get; set; }
     public int? SapDocEntry { get; set; }
     public DateTime? GenerationClaimedAt { get; set; }
     public string? GenerationClaimToken { get; set; }

@@ -1,4 +1,4 @@
-.PHONY: run build test test-coverage watch migrate-add migrate-up docker-up docker-down clean swagger-gen run-e2e-api e2e-reset e2e e2e-full e2e-full-published e2e-seed e2e-full-volume e2e-stability e2e-concurrency e2e-concurrency-ap e2e-concurrency-create e2e-concurrency-approval e2e-picker-consistency
+.PHONY: run build test test-coverage watch migrate-add migrate-up docker-up docker-down clean swagger-gen run-e2e-api e2e-reset e2e e2e-full e2e-full-published e2e-seed e2e-full-volume e2e-stability e2e-concurrency e2e-concurrency-ap e2e-concurrency-apdp e2e-concurrency-create e2e-concurrency-approval e2e-picker-consistency
 
 run:
 	@set -a && . ./.env && set +a && dotnet run --project src/WAMS.Api --no-launch-profile
@@ -29,9 +29,9 @@ e2e:
 e2e-full:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
-	dotnet run --project src/WAMS.Api --no-launch-profile & API_PID=$$!; \
+	( dotnet run --project src/WAMS.Api --no-launch-profile & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
-	./e2e/run.sh $(if $(SKIP),--skip=$(SKIP)); CODE=$$?; kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE
+	./e2e/run.sh $(if $(SKIP),--skip=$(SKIP)); CODE=$$?; kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 # Full e2e cycle using a published binary (ReadyToRun applies - no JIT cold-start).
 # Usage: make e2e-full-published SKIP=18
@@ -39,9 +39,9 @@ e2e-full-published:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
-	./e2e/run.sh $(if $(SKIP),--skip=$(SKIP)); CODE=$$?; kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE
+	./e2e/run.sh $(if $(SKIP),--skip=$(SKIP)); CODE=$$?; kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 # Seed volume data into e2e DB (API must NOT be running - direct psql to test DB)
 # Usage: make e2e-seed SCALE=medium
@@ -61,7 +61,7 @@ e2e-full-volume:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
 	SCALE=$(or $(SCALE),medium) ./e2e/seed_volume.sh --summary-out=/tmp/wams-seed-summary.md && \
 	./e2e/run.sh --out=./e2e/reports/volume.md $(if $(SKIP),--skip=$(SKIP)); CODE=$$?; \
@@ -69,7 +69,7 @@ e2e-full-volume:
 	  cat /tmp/wams-seed-summary.md ./e2e/reports/volume.md > /tmp/wams-vol-final.md && \
 	  mv /tmp/wams-vol-final.md ./e2e/reports/volume.md; \
 	fi; \
-	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE
+	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 # Show stability report across all recorded e2e runs
 e2e-stability:
@@ -88,7 +88,7 @@ e2e-concurrency:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
 	SCALE=small ./e2e/seed_volume.sh --force && \
 	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
@@ -106,33 +106,29 @@ e2e-concurrency:
 	  -e SA_PASSWORD=$$(get_var SA_PASSWORD) \
 	  -e E2E_COMPANY_CODE=$$(get_var E2E_COMPANY_CODE) \
 	  -e RACE_VUS=$(or $(RACE_VUS),10) \
-	  e2e/concurrency/po-generate-race.js; CODE=$$?; \
-	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE
+		e2e/concurrency/po-generate-race.js; CODE=$$?; \
+		kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 # Concurrency race test: N parallel POST /account-payables/{id}/generate on
-# the same draft AP. Same shape as e2e-concurrency, but for
-# AccountPayableService.GenerateAsync, and runs both the non-RFBA (single-
-# stage invoice) and RFBA (two-stage APDP + invoice) code paths since they
-# have different race windows. Applies seed_ap_race_fixture.sql, which seeds
-# one Approved budget plan of each kind under the GCU company (AP
-# availability additionally requires an Approved RecapWorkOrder per plan,
-# unlike PO -- see the fixture's comments).
+# the same draft AP. The RFBA mode first creates a generated PO and its
+# standalone APDP, so this test now exercises only the AP invoice claim race.
+# APDP claim concurrency is covered by e2e-concurrency-apdp below.
 # Usage: make e2e-concurrency-ap RACE_VUS=20
 e2e-concurrency-ap:
 	@fuser -k 8080/tcp 2>/dev/null || true; sleep 1
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
-	SCALE=small ./e2e/seed_volume.sh --force && \
 	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
 	PGHOST=$$(echo "$$CONN" | grep -oP 'Host=\K[^;]+'); \
 	PGPORT=$$(echo "$$CONN" | grep -oP 'Port=\K[^;]+'); \
 	PGDATABASE=$$(echo "$$CONN" | grep -oP 'Database=\K[^;]+'); \
 	PGUSER=$$(echo "$$CONN" | grep -oP 'Username=\K[^;]+'); \
 	export PGPASSWORD=$$(echo "$$CONN" | grep -oP 'Password=\K[^;]+'); \
-	psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -v ON_ERROR_STOP=1 -f e2e/concurrency/seed_ap_race_fixture.sql && \
+	until [ "$$(psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -Atc 'select count(*) from item_shadows' 2>/dev/null)" -gt 0 ] && [ "$$(psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -Atc 'select count(*) from vendor_shadows' 2>/dev/null)" -gt 0 ]; do sleep 1; done; \
+	if ! psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -v ON_ERROR_STOP=1 -f e2e/concurrency/seed_ap_race_fixture.sql; then exit 1; fi; \
 	VARS_ENV=./e2e/vars.env; \
 	get_var() { grep -E "^$$1=" "$$VARS_ENV" | head -1 | cut -d= -f2-; }; \
 	K6ARGS="-e BASE_URL=$$(get_var BASE_URL) -e SA_EMAIL=$$(get_var SA_EMAIL) -e SA_PASSWORD=$$(get_var SA_PASSWORD) -e E2E_COMPANY_CODE=$$(get_var E2E_COMPANY_CODE) -e RACE_VUS=$(or $(RACE_VUS),10)"; \
@@ -141,7 +137,39 @@ e2e-concurrency-ap:
 	echo "=== isRfba=true ==="; \
 	k6 run $$K6ARGS -e ISRFBA=true e2e/concurrency/ap-generate-race.js; CODE2=$$?; \
 	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; \
-	if [ $$CODE1 -ne 0 ] || [ $$CODE2 -ne 0 ]; then exit 99; fi
+	if [ $$CODE1 -ne 0 ] || [ $$CODE2 -ne 0 ]; then exit 99; fi )
+
+# Concurrency race test: N parallel POST /purchase-orders/{id}/generate-apdp
+# on the same generated RFBA PO. The endpoint is idempotent: concurrent callers
+# may receive 409 while the winner is processing or 200 with the same persisted
+# APDP. Uses the same isolated E2E database and waits for startup master-data
+# sync to restore the shared shadow rows before applying its fixture.
+# Usage: make e2e-concurrency-apdp RACE_VUS=20
+e2e-concurrency-apdp:
+	@fuser -k 8080/tcp 2>/dev/null || true; sleep 1
+	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
+	$(MAKE) e2e-reset && \
+	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
+	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
+	PGHOST=$$(echo "$$CONN" | grep -oP 'Host=\K[^;]+'); \
+	PGPORT=$$(echo "$$CONN" | grep -oP 'Port=\K[^;]+'); \
+	PGDATABASE=$$(echo "$$CONN" | grep -oP 'Database=\K[^;]+'); \
+	PGUSER=$$(echo "$$CONN" | grep -oP 'Username=\K[^;]+'); \
+	export PGPASSWORD=$$(echo "$$CONN" | grep -oP 'Password=\K[^;]+'); \
+	until [ "$$(psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -Atc 'select count(*) from item_shadows' 2>/dev/null)" -gt 0 ] && [ "$$(psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -Atc 'select count(*) from vendor_shadows' 2>/dev/null)" -gt 0 ]; do sleep 1; done && \
+	psql -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE" -v ON_ERROR_STOP=1 -f e2e/concurrency/seed_ap_race_fixture.sql && \
+	VARS_ENV=./e2e/vars.env; \
+	get_var() { grep -E "^$$1=" "$$VARS_ENV" | head -1 | cut -d= -f2-; }; \
+	k6 run \
+	  -e BASE_URL=$$(get_var BASE_URL) \
+	  -e SA_EMAIL=$$(get_var SA_EMAIL) \
+	  -e SA_PASSWORD=$$(get_var SA_PASSWORD) \
+	  -e E2E_COMPANY_CODE=$$(get_var E2E_COMPANY_CODE) \
+	  -e RACE_VUS=$(or $(RACE_VUS),10) \
+		e2e/concurrency/apdp-generate-race.js; CODE=$$?; \
+		kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 # Concurrency race test: N parallel POST /purchase-orders, all requesting
 # the same BudgetPlanItem, checking the Fix-3 double-attachment race.
@@ -151,7 +179,7 @@ e2e-concurrency-create:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
 	SCALE=small ./e2e/seed_volume.sh --force && \
 	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
@@ -170,7 +198,7 @@ e2e-concurrency-create:
 	echo "=== AP create race ==="; \
 	k6 run $$K6ARGS e2e/concurrency/ap-create-race.js; CODE2=$$?; \
 	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; \
-	if [ $$CODE1 -ne 0 ] || [ $$CODE2 -ne 0 ]; then exit 99; fi
+	if [ $$CODE1 -ne 0 ] || [ $$CODE2 -ne 0 ]; then exit 99; fi )
 
 # Races one POST /budget-plans/{id}/approve against one POST
 # /budget-plans/{id}/reject on the same seeded budget plan, to check that
@@ -183,7 +211,7 @@ e2e-concurrency-approval:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
 	SCALE=small ./e2e/seed_volume.sh --force && \
 	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
@@ -199,7 +227,7 @@ e2e-concurrency-approval:
 	echo "=== Budget plan approve/reject race ==="; \
 	k6 run $$K6ARGS e2e/concurrency/budget-plan-approve-reject-race.js; CODE=$$?; \
 	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; \
-	if [ $$CODE -ne 0 ]; then exit 99; fi
+	if [ $$CODE -ne 0 ]; then exit 99; fi )
 
 # End-to-end proof that the /available-items picker and the create/update
 # validation path agree over real Postgres (the SQLite parity tests prove
@@ -212,7 +240,7 @@ e2e-picker-consistency:
 	@set -a && . ./.env && if [ -f ./e2e/app.env ]; then . ./e2e/app.env; fi && set +a && \
 	$(MAKE) e2e-reset && \
 	dotnet publish src/WAMS.Api -c Release -r linux-x64 --self-contained false -o /tmp/wams-e2e-publish --verbosity minimal /p:PublishReadyToRun=true && \
-	dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
+	( dotnet /tmp/wams-e2e-publish/WAMS.Api.dll & API_PID=$$!; \
 	until curl -sf http://localhost:8080/health >/dev/null 2>&1; do sleep 1; done && \
 	SCALE=small ./e2e/seed_volume.sh --force && \
 	CONN=$$(grep -E '^ConnectionStrings__DefaultConnection=' ./e2e/app.env | cut -d= -f2- | tr -d '"'); \
@@ -229,8 +257,8 @@ e2e-picker-consistency:
 	  -e SA_EMAIL=$$(get_var SA_EMAIL) \
 	  -e SA_PASSWORD=$$(get_var SA_PASSWORD) \
 	  -e E2E_COMPANY_CODE=$$(get_var E2E_COMPANY_CODE) \
-	  e2e/concurrency/po-picker-consistency.js; CODE=$$?; \
-	kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE
+		e2e/concurrency/po-picker-consistency.js; CODE=$$?; \
+		kill $$API_PID 2>/dev/null || true; wait $$API_PID 2>/dev/null || true; exit $$CODE )
 
 build:
 	dotnet build

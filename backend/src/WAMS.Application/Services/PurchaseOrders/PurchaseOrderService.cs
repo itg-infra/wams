@@ -28,6 +28,8 @@ public class PurchaseOrderService(
     ICodeCounterRepository codeCounterRepo
 ) : IPurchaseOrderService
 {
+    private const int MaxApdpErrorLength = 1000;
+
     public Task<(List<PurchaseOrderSummaryResponse> Items, int TotalCount)> GetAllAsync(
         PurchaseOrderQuery q,
         CancellationToken ct = default
@@ -301,6 +303,8 @@ public class PurchaseOrderService(
                 innerCt
             );
 
+            ValidateRfbaConsistency(request.Items, availableItems);
+
             var prefix = $"PO-{DateTime.UtcNow:yyMM}";
             var code = await DocumentCodeGenerator.NextCodeAsync(codeCounterRepo, prefix, innerCt);
 
@@ -398,6 +402,8 @@ public class PurchaseOrderService(
                     innerCt
                 );
 
+                ValidateRfbaConsistency(request.Items, availableItems);
+
                 po.Items.Clear();
 
                 BuildItems(po, request.Items, availableItems);
@@ -455,6 +461,8 @@ public class PurchaseOrderService(
             if (po.Items.Count == 0)
                 throw new ValidationException(ErrorMessages.PurchaseOrder.NoItemsCannotGenerate);
 
+            ValidateRfbaConsistency(po.Items.Select(item => item.IsRfba));
+
             await EnsurePoWarehouseAccessAsync(
                 userId,
                 po.Items.Select(i => i.BudgetPlanItem.BudgetPlan.WarehouseShadowId).Distinct(),
@@ -510,6 +518,89 @@ public class PurchaseOrderService(
         }
     }
 
+    public async Task<PurchaseOrderResponse> GenerateApdpAsync(
+        long id,
+        long userId,
+        CancellationToken ct = default
+    )
+    {
+        var initial = await poRepo.GetByIdWithItemsAsync(id, ct)
+            ?? throw new NotFoundException(ErrorMessages.PurchaseOrder.NotFound(id));
+
+        if (initial.Status != PurchaseOrderStatus.Generated || initial.SapDocEntry is null)
+            throw new ValidationException(ErrorMessages.PurchaseOrder.CannotGenerateApdpOnlyGenerated);
+
+        var rfbaItems = initial.Items.Where(i => i.IsRfba).OrderBy(i => i.SortOrder).ToList();
+        if (rfbaItems.Count == 0)
+            throw new ValidationException(ErrorMessages.PurchaseOrder.NoRfbaItemsCannotGenerateApdp);
+
+        await EnsurePoWarehouseAccessAsync(
+            userId,
+            initial.Items.Select(i => i.BudgetPlanItem.BudgetPlan.WarehouseShadowId).Distinct(),
+            ct);
+
+        if (initial.SapApdpDocEntry is not null)
+            return MapDetail(initial, []);
+
+        var claimToken = Guid.NewGuid().ToString("N");
+        if (!await poRepo.TryClaimForApdpGenerationAsync(id, claimToken, ct))
+        {
+            var current = await poRepo.GetByIdWithItemsAsync(id, ct)
+                ?? throw new NotFoundException(ErrorMessages.PurchaseOrder.NotFound(id));
+
+            if (current.SapApdpDocEntry is not null)
+                return MapDetail(current, []);
+
+            throw new ConflictException(ErrorMessages.PurchaseOrder.ApdpGenerationInProgress(id));
+        }
+
+        try
+        {
+            var apdpRequest = new SapCreateApdpRequest(
+                initial.Code,
+                initial.Items.First().VendorCode,
+                initial.DocDate,
+                initial.Remark,
+                [.. rfbaItems.Select(i => new SapApLineItem(
+                    i.ItemCode,
+                    i.ItemName,
+                    i.CoaCode,
+                    i.Quantity,
+                    i.CostValue,
+                    i.UomCode,
+                    i.TotalValue,
+                    i.GrandTotal,
+                    i.PpnTaxTypeCode,
+                    i.PphTaxTypeCode,
+                    null,
+                    i.BudgetPlanItem.BudgetPlan.Warehouse?.Code,
+                    i.BillOfLading,
+                    i.BudgetPlanItem.Spk?.ItemCode,
+                    initial.SapDocEntry,
+                    Math.Max(i.SortOrder - 1, 0))) ]);
+
+            var apdpResult = await sapClient.CreateApDownPaymentAsync(apdpRequest, ct)
+                ?? throw new ValidationException(ErrorMessages.PurchaseOrder.SapNoApdpDocument);
+
+            if (!await poRepo.MarkApdpGeneratedAsync(id, claimToken, apdpResult.SapDocEntry, ct))
+                throw new ConflictException(ErrorMessages.PurchaseOrder.ApdpGenerationInProgress(id));
+
+            initial.SapApdpDocEntry = apdpResult.SapDocEntry;
+            initial.SapApdpGeneratedAt = DateTime.UtcNow;
+            initial.SapApdpError = null;
+            return MapDetail(initial, []);
+        }
+        catch (Exception ex)
+        {
+            var error = ex.Message.Length <= MaxApdpErrorLength
+                ? ex.Message
+                : ex.Message[..MaxApdpErrorLength];
+            await poRepo.RecordApdpFailureAsync(id, claimToken, error, CancellationToken.None);
+            await poRepo.ReleaseApdpGenerationClaimAsync(id, claimToken, CancellationToken.None);
+            throw;
+        }
+    }
+
     private async Task ValidateAllItemsAvailableAsync(
         long vendorShadowId,
         List<long> requestedIds,
@@ -550,6 +641,24 @@ public class PurchaseOrderService(
                 ErrorCodes.PurchaseOrderItemVendorMismatch,
                 new PurchaseOrderItemValidationDetails(invalidVendorItems))
             : new ValidationException(string.Join(" ", reasons));
+    }
+
+    private static void ValidateRfbaConsistency(
+        IReadOnlyCollection<long> requestedIds,
+        IReadOnlyCollection<BudgetPlanItem> availableItems)
+    {
+        var requestedItemIds = requestedIds.ToHashSet();
+        ValidateRfbaConsistency(availableItems
+            .Where(item => requestedItemIds.Contains(item.Id))
+            .Select(item => item.IsRfba));
+    }
+
+    private static void ValidateRfbaConsistency(IEnumerable<bool> rfbaValues)
+    {
+        var rfbaValueCount = rfbaValues.Distinct().Count();
+
+        if (rfbaValueCount > 1)
+            throw new ValidationException(ErrorMessages.PurchaseOrder.MixedRfbaItemsNotAllowed);
     }
 
     // Tax fields (PpnAmount/PphAmount/GrandTotal/rates) and Quantity are copied verbatim from the
@@ -677,8 +786,30 @@ public class PurchaseOrderService(
             p.CreatedBy.Fullname,
             p.GeneratedAt,
             p.GeneratedBy?.Fullname,
-            approvers
+            approvers,
+            MapApdp(p)
         );
+    }
+
+    private static PurchaseOrderApdpResponse MapApdp(PurchaseOrder p)
+    {
+        var rfbaItems = p.Items.Where(i => i.IsRfba).ToList();
+        var status = p.Status != PurchaseOrderStatus.Generated
+            ? "PendingPo"
+            : rfbaItems.Count == 0
+                ? "NotRequired"
+                : p.SapApdpDocEntry is not null
+                    ? "Generated"
+                    : p.ApdpGenerationClaimToken is not null
+                        ? "Processing"
+                        : p.SapApdpError is not null ? "Failed" : "Required";
+
+        return new(
+            status,
+            p.SapApdpDocEntry,
+            rfbaItems.Sum(i => i.GrandTotal),
+            p.SapApdpGeneratedAt,
+            p.SapApdpError);
     }
 
     private static RecapPurchaseOrderDetailResponse MapRecapDetail(

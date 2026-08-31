@@ -16,7 +16,7 @@ public interface IAccountPayableRepository
     Task<(List<ApprovedRecapApStatusResponse> Items, int Total)> GetApprovedRecapsWithApStatusAsync(long[]? warehouseIds, int page, int limit, CancellationToken ct = default);
     Task CreateAsync(AccountPayable ap, CancellationToken ct = default);
     Task<bool> TryClaimForGenerationAsync(long id, string claimToken, CancellationToken ct = default);
-    Task<bool> MarkGeneratedAsync(long id, string claimToken, string sapApNumber, int? sapDocEntry, int? sapApdpDocEntry, long generatedByUserId, CancellationToken ct = default);
+    Task<bool> MarkGeneratedAsync(long id, string claimToken, string sapApNumber, int? sapDocEntry, long generatedByUserId, CancellationToken ct = default);
     Task ReleaseGenerationClaimAsync(long id, string claimToken, CancellationToken ct = default);
     Task<bool> LockForEditAsync(long id, CancellationToken ct = default);
     Task<bool> SoftDeleteAsync(long id, CancellationToken ct = default);
