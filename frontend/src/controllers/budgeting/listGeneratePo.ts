@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import type { BudgetPlanResponse } from "../../types/detailBudgetPlan.type";
 import { budgetPlanService } from "../../api/services/budgeting/budgetPlan/detailBudgetPlanService";
 import { useWarehouseStore } from "../../store/warehouseStore";
+import { findEditablePurchaseOrder } from "./purchaseOrderFlow";
 
 export interface UseApprovedBudgetPlanController {
   budgetPlans: ApprovedBudgetPlan[];
@@ -129,7 +130,11 @@ export const useApprovedBudgetPlanController =
 
     const handleNavigatePO = useCallback(
       (item: ApprovedBudgetPlan) => {
-        const existingPurchaseOrderId = item.purchaseOrders?.[0]?.id;
+        // Gunakan kembali hanya PO dengan status Draft. BP parsial dengan PO Generated harus membuat PO baru.
+        const existingPurchaseOrderId = findEditablePurchaseOrder(
+          item.purchaseOrders,
+        )?.id;
+
         const query = existingPurchaseOrderId
           ? `?purchaseOrderId=${existingPurchaseOrderId}`
           : "";

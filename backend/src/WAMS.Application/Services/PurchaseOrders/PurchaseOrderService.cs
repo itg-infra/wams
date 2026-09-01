@@ -712,12 +712,12 @@ public class PurchaseOrderService(
 
     private static PurchaseOrderResponse MapDetail(
         PurchaseOrder p,
-        List<(long BudgetPlanId, long PoId, string PoCode)> siblings
+        List<(long BudgetPlanId, long PoId, string PoCode, string PoStatus)> siblings
     )
     {
         var siblingsByBp = siblings
             .GroupBy(s => s.BudgetPlanId)
-            .ToDictionary(g => g.Key, g => g.Select(s => new PoLinkInfo(s.PoId, s.PoCode)).ToList());
+            .ToDictionary(g => g.Key, g => g.Select(s => new PoLinkInfo(s.PoId, s.PoCode, s.PoStatus)).ToList());
 
         var sourceBudgetPlans = p.Items
             .Select(i => i.BudgetPlanItem.BudgetPlan)
@@ -815,12 +815,12 @@ public class PurchaseOrderService(
     private static RecapPurchaseOrderDetailResponse MapRecapDetail(
         PurchaseOrder p,
         List<PurchaseOrderItem> matchingItems,
-        List<(long BudgetPlanId, long PoId, string PoCode)> siblings
+        List<(long BudgetPlanId, long PoId, string PoCode, string PoStatus)> siblings
     )
     {
         var siblingsByBp = siblings
             .GroupBy(s => s.BudgetPlanId)
-            .ToDictionary(g => g.Key, g => g.Select(s => new PoLinkInfo(s.PoId, s.PoCode)).ToList());
+            .ToDictionary(g => g.Key, g => g.Select(s => new PoLinkInfo(s.PoId, s.PoCode, s.PoStatus)).ToList());
 
         var linkedBudgetPlans = matchingItems
             .Select(i => i.BudgetPlanItem.BudgetPlan)

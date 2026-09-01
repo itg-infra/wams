@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using NSubstitute;
 using WAMS.Application.Common;
 using WAMS.Application.DTOs.PurchaseOrders;
@@ -309,6 +310,19 @@ public class PurchaseOrderAvailabilityTests
                 });
             items.Should().NotContain(x => x.BudgetPlanItemId == seed.OtherVendorItemId);
         }
+    }
+
+    [Fact]
+    public void LinkedPurchaseOrderContract_DeserializesStatus()
+    {
+        var po = JsonSerializer.Deserialize<PoLinkInfo>(
+            "{\"id\":207,\"code\":\"PO-2608000046\",\"status\":\"Generated\"}",
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        po.Should().NotBeNull();
+        po!.Id.Should().Be(207);
+        po.Code.Should().Be("PO-2608000046");
+        po.Status.Should().Be(PurchaseOrderStatus.Generated.Value);
     }
 
     [Fact]

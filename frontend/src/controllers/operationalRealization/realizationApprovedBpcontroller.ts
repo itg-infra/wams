@@ -7,7 +7,6 @@ import type {
 } from "../../types/realizationApprovedBp.type";
 import { useNavigate } from "react-router-dom";
 import { useWarehouseStore } from "../../store/warehouseStore";
-import toast from "react-hot-toast";
 
 export function useRealizationApprovedBpController(
   initialParams?: RealizationApprovedBudgetPlansQueryParams,
@@ -41,20 +40,14 @@ export function useRealizationApprovedBpController(
       budgetPlanId: number,
       purchaseOrderId?: number,
     ) => {
-      try {
-        return await store.fetchAvailableItems(
-          vendorShadowId,
-          budgetPlanId,
-          purchaseOrderId,
-        );
-      } catch (error: any) {
-        toast.error(
-          error?.response?.data?.message ?? "Failed to fetch available items",
-        );
-        return [];
-      }
+      // Teruskan error ke form agar UI dapat menampilkan status gagal
+      return useRealizationApprovedBpstore.getState().fetchAvailableItems(
+        vendorShadowId,
+        budgetPlanId,
+        purchaseOrderId,
+      );
     },
-    [store],
+    [],
   );
 
   const handleSearchChange = useCallback((value: string) => {

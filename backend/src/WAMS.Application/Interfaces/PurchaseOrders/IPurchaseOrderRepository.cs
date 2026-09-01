@@ -17,7 +17,7 @@ public interface IPurchaseOrderRepository
     Task<(List<ApprovedBudgetPlanPoStatusResponse> Items, int Total)> GetApprovedBudgetPlansWithPoStatusAsync(long[]? warehouseIds, DataTableQuery query, CancellationToken ct = default);
     Task<(List<ApprovedBudgetPlanPoStatusResponse> Items, int Total)> GetRecapPurchaseOrdersAsync(bool isRfba, long[]? warehouseIds, DataTableQuery query, CancellationToken ct = default);
     IAsyncEnumerable<ApprovedBudgetPlanPoStatusResponse> StreamRecapPurchaseOrdersAsync(bool isRfba, long[]? warehouseIds, DataTableQuery query, int limit, CancellationToken ct = default);
-    Task<List<(long BudgetPlanId, long PoId, string PoCode)>> GetPoSummariesByBudgetPlanIdsAsync(List<long> budgetPlanIds, long excludePoId, CancellationToken ct = default);
+    Task<List<(long BudgetPlanId, long PoId, string PoCode, string PoStatus)>> GetPoSummariesByBudgetPlanIdsAsync(List<long> budgetPlanIds, long excludePoId, CancellationToken ct = default);
     /// <summary>
     /// SAP DocEntry + 0-based line index (SortOrder - 1) per BudgetPlanItemId with a Generated PO
     /// line, for populating baseEntry/baseLine on AP Invoice/APDP creation.

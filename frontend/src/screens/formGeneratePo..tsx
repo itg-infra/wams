@@ -17,6 +17,7 @@ import { formatNumber } from "../components/format/formatCurrency";
 import toast from "react-hot-toast";
 import { PageHeader } from "../components/ui/page-header";
 import { Button } from "../components/ui/button";
+import { normalizePurchaseOrderId } from "../controllers/budgeting/purchaseOrderFlow";
 
 type LocationState = {
   budgetPlan: ApprovedBudgetPlan;
@@ -75,15 +76,15 @@ function markSeedItems(
 export default function FormGeneratePO() {
   const location = useLocation();
 
-  const state = location.state as LocationState;
+  const state = location.state as LocationState | null;
 
   const budgetPlan = state?.budgetPlan;
   const purchaseOrderIdFromQuery = new URLSearchParams(location.search).get(
     "purchaseOrderId",
   );
   const purchaseOrderId =
-    state?.purchaseOrderId ??
-    (purchaseOrderIdFromQuery ? Number(purchaseOrderIdFromQuery) : undefined);
+    normalizePurchaseOrderId(state?.purchaseOrderId) ??
+    normalizePurchaseOrderId(purchaseOrderIdFromQuery);
 
   const navigate = useNavigate();
 
@@ -123,22 +124,26 @@ export default function FormGeneratePO() {
   const [pickerItems, setPickerItems] = useState<BudgetPlanDetailItem[]>([]);
   const [isPickerLoading, setIsPickerLoading] = useState(false);
   const [pickerRequestError, setPickerRequestError] = useState(false);
+  const [itemsRequestError, setItemsRequestError] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
 
   const [purchaseOrder, setPurchaseOrder] =
     useState<PurchaseOrderDetail | null>(null);
+
+  // PO Generated hanya read-only. PO tanpa ID atau berstatus Draft bisa diedit.
+  const isEditable = !purchaseOrderId || purchaseOrder?.status === "Draft";
 
   const [remark, setRemark] = useState<string>("");
   const [docDate, setDocDate] = useState<string>("03 March 2026");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // tambahkan state, default dari budgetPlan
-  const [selectedVendorShadowId, setSelectedVendorShadowId] = useState<number>(
-    budgetPlan?.vendorShadowId,
-  );
+  const [selectedVendorShadowId, setSelectedVendorShadowId] = useState<
+    number | undefined
+  >(budgetPlan?.vendorShadowId);
 
   const [selectedVendorName, setSelectedVendorName] = useState<string>(
-    budgetPlan?.vendorName,
+    budgetPlan?.vendorName ?? "",
   );
 
   const [draftSelectedItemIds, setDraftSelectedItemIds] = useState<number[]>(
@@ -244,45 +249,52 @@ export default function FormGeneratePO() {
   }, [pickerAdditionalItems, pickerSearch]);
 
   useEffect(() => {
-    if (!budgetPlan?.budgetPlanId) return;
+    // Create-flow mengambil item seed dari endpoint availability agar item terpakai terfilter.
+    if (!budgetPlan?.budgetPlanId || purchaseOrderId || !selectedVendorShadowId) {
+      return;
+    }
+
+    let cancelled = false;
 
     const loadInitialItems = async () => {
-      if (purchaseOrderId) return;
-
       setIsLoading(true);
+      setItemsRequestError(false);
+
       try {
-        const detail = await budgetPlanDetailService.getBudgetPlanDetail(
-          String(budgetPlan.budgetPlanId),
+        const availableItems = await fetchAvailableItems(
+          selectedVendorShadowId,
+          budgetPlan.budgetPlanId,
         );
 
-        const items = detail.items;
+        if (cancelled) return;
 
-        console.log(
-          `[DEBUG][loadInitialItems] budgetPlanId=${budgetPlan.budgetPlanId} -> ${items.length} item:`,
-          items.map((it) => ({
-            id: it.id,
-            itemCode: it.itemCode,
-            budgetPlanId: it.budgetPlanId,
-          })),
+        const seedItems = markSeedItems(
+          uniqueItems(availableItems.filter((item) => item.isSeedBudgetPlan)),
+          budgetPlan,
         );
-
-        const seedItems = markSeedItems(uniqueItems(items), budgetPlan);
 
         setBaseItems(seedItems);
         setAllItems(seedItems);
       } catch (error) {
-        console.error("Failed to fetch initial BP items:", error);
+        if (cancelled) return;
+
+        console.error("Failed to fetch available BP items:", error);
+        setItemsRequestError(true);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     loadInitialItems();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     budgetPlan?.budgetPlanId,
-    budgetPlan?.vendorShadowId,
     selectedVendorShadowId,
     purchaseOrderId,
+    fetchAvailableItems,
   ]);
 
   useEffect(() => {
@@ -364,6 +376,8 @@ export default function FormGeneratePO() {
   }, [detail, budgetPlan?.vendorShadowId, selectedVendorShadowId, purchaseOrderId]);
 
   const handleOpenModal = async () => {
+    if (!isEditable) return;
+
     const vendorShadowId = selectedVendorShadowId ?? budgetPlan?.vendorShadowId;
 
     if (!vendorShadowId || !budgetPlan?.budgetPlanId) {
@@ -398,6 +412,8 @@ export default function FormGeneratePO() {
   };
 
   const toggleCheck = (id: number) => {
+    if (!isEditable) return;
+
     setSelectedRowIds((prev) => {
       const exists = prev.includes(id);
 
@@ -411,6 +427,8 @@ export default function FormGeneratePO() {
 
   // Pilihan sementara baru diterapkan setelah user menekan Apply.
   const toggleDraftSelectedItem = (itemId: number) => {
+    if (!isEditable) return;
+
     setDraftSelectedItemIds((prev) =>
       prev.includes(itemId)
         ? prev.filter((id) => id !== itemId)
@@ -420,7 +438,7 @@ export default function FormGeneratePO() {
 
   // Gabungkan item seed dengan item tambahan yang dicentang di picker.
   const handleApplyModal = () => {
-    if (isPickerLoading || pickerRequestError) {
+    if (!isEditable || isPickerLoading || pickerRequestError) {
       return;
     }
 
@@ -448,6 +466,8 @@ export default function FormGeneratePO() {
 
   // Hapus seluruh item milik BP tambahan dan bersihkan selection terkait.
   const removeTag = (budgetPlanId: number) => {
+    if (!isEditable) return;
+
     const retainedBaseItems = baseItems.filter(
       (item) => item.budgetPlanId !== budgetPlanId,
     );
@@ -485,7 +505,7 @@ export default function FormGeneratePO() {
   }, [allItems, selectedRowIds]);
 
   const handleGenerate = async () => {
-    if (selectedRowIds.length === 0) {
+    if (!isEditable || selectedRowIds.length === 0 || !selectedVendorShadowId) {
       console.warn("No items selected");
       return;
     }
@@ -519,7 +539,7 @@ export default function FormGeneratePO() {
   };
 
   const handleDraft = async () => {
-    if (selectedRowIds.length === 0) {
+    if (!isEditable || selectedRowIds.length === 0 || !selectedVendorShadowId) {
       console.warn("No items selected");
       return;
     }
@@ -552,7 +572,7 @@ export default function FormGeneratePO() {
     }
   };
 
-  const canSubmit = !purchaseOrderId || purchaseOrder?.status === "Draft";
+  const canSubmit = isEditable && Boolean(selectedVendorShadowId);
 
   const uniqueVendors = useMemo(() => {
     const map = new Map<number, BudgetPlanDetailItem>();
@@ -585,6 +605,12 @@ export default function FormGeneratePO() {
             onBack={() => navigate(-1)}
           />
 
+          {purchaseOrder && !isEditable && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              This Purchase Order is Generated and read-only.
+            </div>
+          )}
+
           {/* Form Fields */}
           <div className="mb-4">
             {/* Row 1 */}
@@ -597,13 +623,16 @@ export default function FormGeneratePO() {
                 <div className="relative" ref={vendorDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setIsVendorOpen((prev) => !prev)}
+                    disabled={!isEditable}
+                    onClick={() => {
+                      if (isEditable) setIsVendorOpen((prev) => !prev);
+                    }}
                     title={
                       selectedVendorItem
                         ? `${selectedVendorItem.vendorCode} - ${selectedVendorItem.vendorName}`
                         : undefined
                     }
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-700 bg-white focus:outline-none focus:border-indigo-400 cursor-pointer flex items-center justify-between gap-2"
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-700 bg-white focus:outline-none focus:border-indigo-400 cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-100 flex items-center justify-between gap-2"
                   >
                     {selectedVendorItem ? (
                       <span className="flex items-center gap-2 min-w-0">
@@ -693,8 +722,9 @@ export default function FormGeneratePO() {
                   type="text"
                   placeholder="Input Remark"
                   value={remark}
+                  disabled={!isEditable}
                   onChange={(e) => setRemark(e.target.value)}
-                  className="w-full sm:w-100 border border-gray-300 rounded-lg px-2.5 py-1.5 text-[13px] bg-white focus:outline-none focus:border-indigo-400 placeholder-gray-400"
+                  className="w-full sm:w-100 border border-gray-300 rounded-lg px-2.5 py-1.5 text-[13px] bg-white focus:outline-none focus:border-indigo-400 placeholder-gray-400 disabled:cursor-not-allowed disabled:bg-gray-100"
                 />
               </div>
             </div>
@@ -710,8 +740,9 @@ export default function FormGeneratePO() {
                   <input
                     type="text"
                     value={docDate}
+                    disabled={!isEditable}
                     onChange={(e) => setDocDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 pr-8 text-[13px] text-gray-700 bg-white focus:outline-none focus:border-indigo-400"
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 pr-8 text-[13px] text-gray-700 bg-white focus:outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:bg-gray-100"
                   />
                 </div>
               </div>
@@ -746,7 +777,8 @@ export default function FormGeneratePO() {
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="w-5 h-5 rounded-[3px] bg-[#4f46e5] hover:bg-indigo-700 flex items-center justify-center shrink-0 transition-colors"
+                disabled={!isEditable}
+                className="w-5 h-5 rounded-[3px] bg-[#4f46e5] hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300 flex items-center justify-center shrink-0 transition-colors"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path
@@ -766,8 +798,10 @@ export default function FormGeneratePO() {
                   {tag.label}
 
                   <button
+                    type="button"
                     onClick={() => removeTag(tag.id)}
-                    className="text-[#3730a3] hover:text-red-500 ml-0.5 leading-none transition-colors text-[11px]"
+                    disabled={!isEditable}
+                    className="text-[#3730a3] hover:text-red-500 disabled:cursor-not-allowed disabled:text-gray-400 ml-0.5 leading-none transition-colors text-[11px]"
                   >
                     ✕
                   </button>
@@ -775,6 +809,12 @@ export default function FormGeneratePO() {
               ))}
             </div>
           </div>
+
+          {itemsRequestError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              Unable to load available Purchase Order items. Please try again.
+            </div>
+          )}
 
           {/* Table */}
           <div className="bg-[#d9dde3] rounded-[6px] p-3 overflow-x-auto">
@@ -1069,7 +1109,7 @@ export default function FormGeneratePO() {
                               <td className="pl-2">
                                 <button
                                   type="button"
-                                  disabled={item.isGenerated}
+                                  disabled={!isEditable || item.isGenerated}
                                   onClick={() => {
                                     if (item.isGenerated) return;
 

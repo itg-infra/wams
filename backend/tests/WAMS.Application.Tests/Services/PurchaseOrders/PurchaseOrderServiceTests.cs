@@ -666,7 +666,7 @@ public class PurchaseOrderServiceTests
             Arg.Is<List<long>>(l => l.SequenceEqual(new[] { 10L })),
             99L,
             Arg.Any<CancellationToken>())
-            .Returns(new List<(long, long, string)> { (10L, 200L, "PO-002") });
+            .Returns(new List<(long, long, string, string)> { (10L, 200L, "PO-002", "Draft") });
 
         var sut = CreateSut();
         var result = await sut.GetByIdAsync(99L, TestContext.Current.CancellationToken);
@@ -705,7 +705,7 @@ public class PurchaseOrderServiceTests
         _poRepo.GetByIdWithItemsAsync(99L, Arg.Any<CancellationToken>()).Returns(po);
         _poRepo.GetPoSummariesByBudgetPlanIdsAsync(
             Arg.Any<List<long>>(), 99L, Arg.Any<CancellationToken>())
-            .Returns(new List<(long, long, string)>());
+            .Returns(new List<(long, long, string, string)>());
 
         var sut = CreateSut();
         var result = await sut.GetByIdAsync(99L, TestContext.Current.CancellationToken);
@@ -1466,7 +1466,7 @@ public class PurchaseOrderServiceTests
         };
         _poRepo.GetByIdWithItemsAsync(1L, Arg.Any<CancellationToken>()).Returns(po);
         _poRepo.GetPoSummariesByBudgetPlanIdsAsync(Arg.Any<List<long>>(), 1L, Arg.Any<CancellationToken>())
-            .Returns(new List<(long, long, string)>());
+            .Returns(new List<(long, long, string, string)>());
 
         var sut = CreateSut();
         var result = await sut.GetRecapDetailAsync(true, 1L, CancellationToken.None);
@@ -1504,7 +1504,7 @@ public class PurchaseOrderServiceTests
         };
         _poRepo.GetByIdWithItemsAsync(2L, Arg.Any<CancellationToken>()).Returns(po);
         _poRepo.GetPoSummariesByBudgetPlanIdsAsync(Arg.Any<List<long>>(), 2L, Arg.Any<CancellationToken>())
-            .Returns(new List<(long, long, string)>());
+            .Returns(new List<(long, long, string, string)>());
 
         var sut = CreateSut();
         var result = await sut.GetRecapDetailAsync(true, 2L, CancellationToken.None);

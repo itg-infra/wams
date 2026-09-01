@@ -1,6 +1,8 @@
 export interface PurchaseOrder {
   id: number;
   code: string;
+  // Status menentukan apakah PO boleh dipakai kembali sebagai edit-flow.
+  status: string;
 }
 
 export interface ApprovedBudgetPlan {

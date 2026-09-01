@@ -2,7 +2,7 @@ namespace WAMS.Application.DTOs.PurchaseOrders;
 
 using WAMS.Application.Common;
 
-public record PoLinkInfo(long Id, string Code);
+public record PoLinkInfo(long Id, string Code, string Status);
 
 // One entry per stage of the source budget plan's approval workflow, in StageOrder,
 // so the printed "Disetujui Oleh" block scales with the company's workflow template -

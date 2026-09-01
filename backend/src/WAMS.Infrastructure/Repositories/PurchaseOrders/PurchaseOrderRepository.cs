@@ -287,7 +287,7 @@ public class PurchaseOrderRepository(
                     .ThenInclude(bpi => bpi.Spk)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
-    public async Task<List<(long BudgetPlanId, long PoId, string PoCode)>> GetPoSummariesByBudgetPlanIdsAsync(
+    public async Task<List<(long BudgetPlanId, long PoId, string PoCode, string PoStatus)>> GetPoSummariesByBudgetPlanIdsAsync(
         List<long> budgetPlanIds,
         long excludePoId,
         CancellationToken ct = default
@@ -306,12 +306,13 @@ public class PurchaseOrderRepository(
             {
                 poi.BudgetPlanItem.BudgetPlanId,
                 PoId = poi.PurchaseOrderId,
-                PoCode = poi.PurchaseOrder.Code
+                PoCode = poi.PurchaseOrder.Code,
+                PoStatus = poi.PurchaseOrder.Status.Value
             })
             .Distinct()
             .ToListAsync(ct);
 
-        return [.. rows.Select(x => (x.BudgetPlanId, x.PoId, x.PoCode))];
+        return [.. rows.Select(x => (x.BudgetPlanId, x.PoId, x.PoCode, x.PoStatus))];
     }
 
     public async Task<List<BudgetPlanItem>> GetAvailableItemsAsync(
@@ -675,7 +676,7 @@ public class PurchaseOrderRepository(
                     COALESCE(
                         (SELECT json_agg(po_sub ORDER BY po_sub.id)
                          FROM (
-                             SELECT DISTINCT po."Id" AS id, po.code
+                             SELECT DISTINCT po."Id" AS id, po.code, po.status
                              FROM purchase_order_items poi
                              JOIN purchase_orders po ON po."Id" = poi.purchase_order_id
                              JOIN budget_plan_items bpi2 ON bpi2."Id" = poi.budget_plan_item_id
@@ -855,7 +856,7 @@ public class PurchaseOrderRepository(
                     COALESCE(
                         (SELECT json_agg(po_sub ORDER BY po_sub.id)
                          FROM (
-                             SELECT DISTINCT po."Id" AS id, po.code
+                             SELECT DISTINCT po."Id" AS id, po.code, po.status
                              FROM purchase_order_items poi
                              JOIN purchase_orders po ON po."Id" = poi.purchase_order_id
                              JOIN budget_plan_items bpi2 ON bpi2."Id" = poi.budget_plan_item_id
@@ -1043,7 +1044,7 @@ public class PurchaseOrderRepository(
                     COALESCE(
                         (SELECT json_agg(po_sub ORDER BY po_sub.id)
                          FROM (
-                             SELECT DISTINCT po."Id" AS id, po.code
+                             SELECT DISTINCT po."Id" AS id, po.code, po.status
                              FROM purchase_order_items poi
                              JOIN purchase_orders po ON po."Id" = poi.purchase_order_id
                              JOIN budget_plan_items bpi2 ON bpi2."Id" = poi.budget_plan_item_id
