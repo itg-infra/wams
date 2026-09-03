@@ -37,10 +37,22 @@ Get-Content -LiteralPath $EnvFile | ForEach-Object {
     Set-Item -Path "Env:$key" -Value $value
 }
 
-# Run from backend/ so relative paths such as logs/ and storage/ resolve correctly.
-Push-Location $PSScriptRoot
+# Keep generated production files inside the existing repository folder.
+$publishDir = Join-Path $PSScriptRoot "publish"
+
+Write-Host "Publishing WAMS API to $publishDir..."
+& dotnet publish (Join-Path $PSScriptRoot "src\WAMS.Api\WAMS.Api.csproj") `
+    --configuration Release `
+    --output $publishDir
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish failed with exit code $LASTEXITCODE"
+}
+
+# Run from publish/ so appsettings.json and all published files are resolved correctly.
+Push-Location $publishDir
 try {
-    & dotnet run --project ".\src\WAMS.Api" --no-launch-profile
+    & dotnet ".\WAMS.Api.dll"
     exit $LASTEXITCODE
 }
 finally {
