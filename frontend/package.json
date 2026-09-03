@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "vite preview --host 0.0.0.0 --port 5173",
+    "prod": "npm run build && npm run start"
   },
   "dependencies": {
     "@sentry/react": "^10.69.0",
