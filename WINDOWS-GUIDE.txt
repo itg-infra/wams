@@ -167,6 +167,54 @@ SETELAH PULL PERUBAHAN DARI GIT
 4. Jalankan npm ci kembali jika package.json atau package-lock.json berubah.
 
 
+BACKGROUND DEPLOYMENT (OPSIONAL)
+--------------------------------
+
+Gunakan Task Scheduler agar backend dan frontend berjalan otomatis setelah
+Windows menyala. Buat dua task dengan opsi General berikut:
+
+    Run whether user is logged on or not
+    Run with highest privileges
+
+Task 1 - WAMS Backend
+
+Trigger:
+
+    At startup, delay 30 seconds
+
+Action:
+
+    Program: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+    Arguments: -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\Documents\GitHub\wams\backend\run.ps1"
+    Start in: C:\Users\Administrator\Documents\GitHub\wams\backend
+
+Task 2 - WAMS Frontend
+
+Trigger:
+
+    At startup, delay 60 seconds
+
+Action:
+
+    Program: C:\Program Files\nodejs\npm.cmd
+    Arguments: start
+    Start in: C:\Users\Administrator\Documents\GitHub\wams\frontend
+
+Pada kedua task, aktifkan Allow task to be run on demand dan pengaturan
+restart task jika gagal. Setelah task dibuat, klik kanan task → Run untuk
+menguji.
+
+Pemeriksaan:
+
+    Backend:  http://localhost:8080/health
+    Frontend: http://localhost:5173
+
+Setelah update backend, pilih End lalu Run pada task WAMS Backend.
+Setelah update frontend, pilih End pada task WAMS Frontend, jalankan
+    npm run build
+di folder frontend, lalu pilih Run pada task WAMS Frontend.
+
+
 CATATAN
 -------
 
