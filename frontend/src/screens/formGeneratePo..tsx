@@ -375,6 +375,22 @@ export default function FormGeneratePO() {
     }
   }, [detail, budgetPlan?.vendorShadowId, selectedVendorShadowId, purchaseOrderId]);
 
+  const normalizeRfba = (value: unknown): boolean => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.toLowerCase() === "true";
+    if (typeof value === "number") return value === 1;
+    return false;
+  };
+
+  const activeRfbaStatus = useMemo(() => {
+    if (selectedRowIds.length === 0) return null;
+
+    const firstSelected = allItems.find(
+      (item) => item.id === selectedRowIds[0],
+    );
+    return firstSelected ? normalizeRfba(firstSelected.isRfba) : null;
+  }, [selectedRowIds, allItems]);
+
   const handleOpenModal = async () => {
     if (!isEditable) return;
 
@@ -855,6 +871,12 @@ export default function FormGeneratePO() {
                   allItems.map((row) => {
                     const checked = selectedRowIds.includes(row.id);
 
+                    const isDisabled =
+                      !isEditable ||
+                      (activeRfbaStatus !== null &&
+                        normalizeRfba(row.isRfba) !== activeRfbaStatus &&
+                        !checked); // item yang UDAH dicentang jangan ikut ke-disable
+
                     return (
                       <tr key={row.id}>
                         {[
@@ -880,10 +902,13 @@ export default function FormGeneratePO() {
                           <button
                             type="button"
                             onClick={() => toggleCheck(row.id)}
+                            disabled={isDisabled}
                             className={`w-4.5 h-4.5 rounded-[3px] flex items-center justify-center border transition-all ${
                               checked
                                 ? "bg-[#3f2b96] border-[#3f2b96]"
-                                : "bg-[#efefef] border-[#9ca3af]"
+                                : isDisabled
+                                  ? "bg-[#e5e5e5] border-[#d1d5db] cursor-not-allowed"
+                                  : "bg-[#efefef] border-[#9ca3af]"
                             }`}
                           >
                             {checked && (

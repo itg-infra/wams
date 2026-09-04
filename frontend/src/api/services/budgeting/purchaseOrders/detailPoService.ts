@@ -1,4 +1,4 @@
-import axiosProvider from "../../../providers/axiosProvider"; 
+import axiosProvider from "../../../providers/axiosProvider";
 
 export type PurchaseOrderPayload = {
   vendorShadowId: number;
@@ -52,6 +52,15 @@ export type PurchaseOrderDetailItem = {
   totalValue: number;
 
   sortOrder: number;
+
+  ppnTaxTypeCode: string;
+  ppnRate: number;
+  pphTaxTypeCode: string;
+  pphRate: number;
+  ppnAmount: number;
+  pphAmount: number;
+  grandTotal: number;
+  costTreatment: string;
 };
 
 export type PurchaseOrderDetail = {
@@ -80,6 +89,22 @@ export type PurchaseOrderDetail = {
 
   generatedAt: string | null;
   generatedByName: string | null;
+
+  approvers: approverItems[];
+  apdp: apdpItem | null;
+};
+
+export type approverItems = {
+  name: string;
+  approvedAt: string;
+};
+
+export type apdpItem = {
+  status: string;
+  sapDocEntry: string | null;
+  amount: number;
+  generatedAt: string | null;
+  error: string | null;
 };
 
 export type PurchaseOrderDetailResponse = {
@@ -90,7 +115,6 @@ export type PurchaseOrderDetailResponse = {
 };
 
 export const detailPoService = {
-
   getPurchaseOrderDetail: async (
     id: number,
   ): Promise<PurchaseOrderDetailResponse> => {
@@ -118,6 +142,16 @@ export const detailPoService = {
   ): Promise<PurchaseOrderMutationResponse> => {
     const response = await axiosProvider.post<PurchaseOrderMutationResponse>(
       `api/v1/purchase-orders/${id}/generate`,
+    );
+
+    return response.data;
+  },
+
+  generateAPDP: async (
+    poId: number,
+  ): Promise<PurchaseOrderMutationResponse> => {
+    const response = await axiosProvider.post<PurchaseOrderMutationResponse>(
+      `api/v1/purchase-orders/${poId}/generate-apdp`,
     );
 
     return response.data;

@@ -137,11 +137,11 @@ export default function FormEditWoScreen() {
 
       case "Storage":
         setRows(
-          data.others
+          data.storage
             ? [
                 {
                   ...createEmptyRow(1),
-                  ...data.others,
+                  ...data.storage,
                 },
               ]
             : [],
@@ -499,7 +499,7 @@ export default function FormEditWoScreen() {
     },
     {
       key: "Storage",
-      data: data.others,
+      data: data.storage,
     },
     {
       key: "QC",

@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "vite preview",
-    "prod": "npm run build && npm run start"
+    "start": "npm run build && npm run preview"
   },
   "dependencies": {
     "@sentry/react": "^10.69.0",

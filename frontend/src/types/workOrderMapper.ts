@@ -107,7 +107,7 @@ export function mapWorkOrderDetailToRows(
 
     // case "K.GUDANG":
     case "OTHERS": {
-      const s = detail.others;
+      const s = detail.storage;
 
       // Jika data 'others' dari backend kosong (belum diisi),
       // berikan nilai default (false / 0) agar form TETEAP MUNCUL.

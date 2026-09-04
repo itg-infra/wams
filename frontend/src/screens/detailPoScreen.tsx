@@ -1,10 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDetailPoController } from "../controllers/budgeting/detailPoController";
 import { DataTable, type Column } from "../components/ui/table";
 import { PageHeader } from "../components/ui/page-header";
-import type { PurchaseOrderDetailItem } from "../api/services/budgeting/purchaseOrders/detailPoService";
+import {
+  detailPoService,
+  type PurchaseOrderDetailItem,
+} from "../api/services/budgeting/purchaseOrders/detailPoService";
 import { useExportFileController } from "../controllers/file/exportFileController";
+import { Button } from "../components/ui/button";
+import toast from "react-hot-toast";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -56,6 +61,20 @@ const itemColumns: Column<PurchaseOrderDetailItem>[] = [
         <p className="font-medium text-gray-800">{item.coaCode}</p>
 
         <p className="text-xs text-gray-500">{item.coaName}</p>
+      </div>
+    ),
+  },
+
+  {
+    key: "rfba",
+    header: "RFBA",
+    render: (item) => (
+      <div className="space-y-1">
+        <p className="font-medium text-gray-800">
+          {item.isRfba ? "Yes" : "No"}
+        </p>
+
+        <p className="text-xs text-gray-500">{item.isRfba ? "Yes" : "No"}</p>
       </div>
     ),
   },
@@ -159,6 +178,8 @@ export function DetailPoScreen() {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -182,6 +203,52 @@ export function DetailPoScreen() {
       </div>
     );
   }
+const hasRfbaItem = detail.items?.some((item) => item.isRfba === true) ?? false;
+const hasSapPONumber = Boolean(detail.sapPoNumber);
+const isStatusGenerated = detail.status?.toLowerCase() === "generated";
+const isAlreadyGenerated = detail.apdp?.sapDocEntry != null;
+
+const canGenerate =
+  hasRfbaItem && hasSapPONumber && isStatusGenerated && !isAlreadyGenerated;
+const isGenerateDisabled = isSubmitting || !canGenerate;
+
+  console.log("GENERATE APDP CONDITION:", {
+    status: detail.status,
+    isAlreadyGenerated: detail.status === "Generated",
+    sapPONumber: detail.sapPoNumber,
+    hasSapPONumber: Boolean(detail.sapPoNumber),
+    hasRfbaItem,
+    isSubmitting,
+    onsubmit,
+  });
+
+  const handleGenerate = async () => {
+    if (!detail?.id) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const response = await detailPoService.generateAPDP(detail.id);
+
+      if (response.success) {
+        // optional: refresh detail PO
+        await loadDetail(detail.id);
+
+        // optional notification
+        toast.success(response.message || "APDP berhasil di-generate");
+      } else {
+        toast.error(response.message || "Gagal generate APDP");
+      }
+    } catch (error) {
+      console.error("Generate APDP error:", error);
+
+      toast.error("Terjadi kesalahan saat generate APDP");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 overflow-y-auto">
@@ -296,47 +363,66 @@ export function DetailPoScreen() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-        <div className="rounded-3xl bg-white border border-indigo-100 p-6 shadow-sm hover:shadow-md transition">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+        {/* Grand Total */}
+        <div className="rounded-2xl bg-white border border-indigo-100 p-5 shadow-sm hover:shadow-md transition">
           <p className="text-sm text-gray-500">Grand Total</p>
 
-          <h3 className="mt-3 text-3xl font-bold text-[#2E277C]">
+          <h3 className="mt-2 text-2xl font-bold text-[#2E277C] wrap-break-word">
             {formatCurrency(detail.grandTotal)}
           </h3>
 
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-gray-400">
             Total purchase order amount
           </p>
         </div>
 
-        <div className="rounded-3xl bg-white border border-gray-200 p-6 shadow-sm">
+        {/* SAP Doc Entry */}
+        <div className="rounded-2xl bg-white border border-indigo-100 p-5 shadow-sm hover:shadow-md transition">
+          <p className="text-sm text-gray-500">SAP Doc Entry</p>
+
+          <h3 className="mt-2 text-xl font-bold text-[#2E277C] wrap-break-word">
+            {detail.apdp?.sapDocEntry ?? "No Generated APDP"}
+          </h3>
+
+          <p className="mt-1 text-xs text-gray-400">
+            {formatDate(detail.apdp?.generatedAt)}
+          </p>
+        </div>
+
+        {/* Total Items */}
+        <div className="rounded-2xl bg-white border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
           <p className="text-sm text-gray-500">Total Items</p>
 
-          <h3 className="mt-3 text-3xl font-bold text-gray-900">
+          <h3 className="mt-2 text-2xl font-bold text-gray-900">
             {detail.items.length}
           </h3>
 
-          <p className="mt-2 text-xs text-gray-400">Line items</p>
+          <p className="mt-1 text-xs text-gray-400">Line items</p>
         </div>
 
-        <div className="rounded-3xl bg-white border border-gray-200 p-6 shadow-sm">
+        {/* Created By */}
+        <div className="rounded-2xl bg-white border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
           <p className="text-sm text-gray-500">Created By</p>
 
-          <h3 className="mt-3 text-lg font-semibold">{detail.createdByName}</h3>
+          <h3 className="mt-2 text-lg font-semibold text-gray-900 break-words">
+            {detail.createdByName}
+          </h3>
 
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="mt-1 text-xs text-gray-500">
             {formatDate(detail.createdAt)}
           </p>
         </div>
 
-        <div className="rounded-3xl bg-white border border-gray-200 p-6 shadow-sm">
+        {/* Generated By */}
+        <div className="rounded-2xl bg-white border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
           <p className="text-sm text-gray-500">Generated By</p>
 
-          <h3 className="mt-3 text-lg font-semibold">
+          <h3 className="mt-2 text-lg font-semibold text-gray-900 break-words">
             {detail.generatedByName ?? "-"}
           </h3>
 
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="mt-1 text-xs text-gray-500">
             {formatDate(detail.generatedAt)}
           </p>
         </div>
@@ -457,6 +543,14 @@ export function DetailPoScreen() {
           </div>
         </div>
       </div>
+      <Button
+        variant="primary"
+        onClick={handleGenerate}
+        disabled={isGenerateDisabled}
+        className="w-full sm:w-auto px-7"
+      >
+        {isSubmitting ? "Generating..." : "Generate APDP"}
+      </Button>
     </div>
   );
 }

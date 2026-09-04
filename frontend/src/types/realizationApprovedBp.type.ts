@@ -5,6 +5,7 @@ export interface ApprovedPlanActivity {
   activityName: string;
   activityTypeCode: string;
   activityTypeDisplay: string;
+  coaName: string;
   workOrderId: number | null;
   workOrderCode: string | null;
   workOrderStatus: "Draft" | "Submitted" | "Approved" | null;
@@ -23,6 +24,7 @@ export interface RealizationApprovedBpApiItem {
   isRfba: boolean;
   docDate: string;
   isLocked: boolean;
+  allSubmitted: boolean;
   makerName: string;
   vendorName: string;
   activities: ApprovedPlanActivity[];
@@ -54,6 +56,7 @@ export interface RealizationApprovedBpItem {
   makerName: string;
   vendorName: string;
   isLocked: boolean;
+  allSubmitted: boolean;
   activities: ApprovedPlanActivity[];
   purchaseOrderId: number;
   purchaseOrderCode: string;

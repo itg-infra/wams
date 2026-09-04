@@ -166,7 +166,7 @@ export interface WorkOrderDetail {
 
   fumigation: FumigationItem | null;
 
-  others: StorageItem | null;
+  storage: StorageItem | null;
   qc: QcItem | null;
   heavyEquipment: HeavyEquipmentItem | null;
   unbagging: UnbaggingItem | null;

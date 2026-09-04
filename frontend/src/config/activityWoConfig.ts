@@ -2,7 +2,7 @@ import type { WorkOrderRow } from "./workOrderRowConfig";
 
 export type FieldType = "text" | "number" | "boolean";
 
-export type LayoutType = "table" | "grid" | "inline" | "checklist";
+export type LayoutType = "table" | "grid" | "inline" | "checklist" | "others";
 
 export type FieldConfig = {
   label: string;
@@ -13,6 +13,10 @@ export type FieldConfig = {
   // optional ui props
   colSpan?: number;
   placeholder?: string;
+
+  variant?: "radio" | "checkbox"; // gaya toggle untuk boolean
+  group?: "tools"; // untuk mengelompokkan ke section "Tools"
+  unit?: string; // suffix unit di sebelah input, mis. "Kg"
 };
 
 export type ActivityConfig = {
@@ -772,65 +776,125 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
 
   // ================= Others =================
 
-  OTHERS: {
-    layout: "checklist",
-    columns: 3,
+  // OTHERS: {
+  //   layout: "checklist",
+  //   columns: 3,
 
+  //   fields: [
+  //     {
+  //       label: "Pindah Stapel",
+  //       key: "hasPindahStapel",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Pembersihan",
+  //       key: "hasPembersihan",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Perapihan",
+  //       key: "hasPerapihan",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Volume Weight",
+  //       key: "volumeWeight",
+  //       type: "number",
+  //     },
+  //     {
+  //       label: "Worker On Duty",
+  //       key: "workerOnDuty",
+  //       type: "number",
+  //     },
+  //     {
+  //       label: "Mask",
+  //       key: "hasMask",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Safety Glasses",
+  //       key: "hasSafetyGlasses",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Hand Gloves",
+  //       key: "hasHandGloves",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Helmet",
+  //       key: "hasHelmet",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Safety Shoes",
+  //       key: "hasSafetyShoes",
+  //       type: "boolean",
+  //     },
+  //     {
+  //       label: "Safety Vest",
+  //       key: "hasSafetyVest",
+  //       type: "boolean",
+  //     },
+  //   ],
+  // },
+
+  OTHERS: {
+    layout: "others",
     fields: [
       {
         label: "Pindah Stapel",
         key: "hasPindahStapel",
         type: "boolean",
+        variant: "radio",
       },
       {
         label: "Pembersihan",
         key: "hasPembersihan",
         type: "boolean",
+        variant: "radio",
       },
       {
         label: "Perapihan",
         key: "hasPerapihan",
         type: "boolean",
+        variant: "radio",
       },
+
       {
         label: "Volume Weight",
         key: "volumeWeight",
         type: "number",
+        unit: "Kg",
       },
-      {
-        label: "Worker On Duty",
-        key: "workerOnDuty",
-        type: "number",
-      },
-      {
-        label: "Mask",
-        key: "hasMask",
-        type: "boolean",
-      },
+      { label: "Worker on Duty", key: "workerOnDuty", type: "number" },
+
+      // urutan row-major untuk grid 2 kolom kanan
+      { label: "Mask", key: "hasMask", type: "boolean", group: "tools" },
       {
         label: "Safety Glasses",
         key: "hasSafetyGlasses",
         type: "boolean",
+        group: "tools",
       },
       {
         label: "Hand Gloves",
         key: "hasHandGloves",
         type: "boolean",
+        group: "tools",
       },
-      {
-        label: "Helmet",
-        key: "hasHelmet",
-        type: "boolean",
-      },
+      { label: "Helmet", key: "hasHelmet", type: "boolean", group: "tools" },
       {
         label: "Safety Shoes",
         key: "hasSafetyShoes",
         type: "boolean",
+        group: "tools",
       },
       {
         label: "Safety Vest",
         key: "hasSafetyVest",
         type: "boolean",
+        group: "tools",
       },
     ],
   },

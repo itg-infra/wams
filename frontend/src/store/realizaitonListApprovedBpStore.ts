@@ -73,34 +73,6 @@ export const useRealizationApprovedBpstore = create<RealizationBpStoreState>(
     availableItems: [],
     availableItemsLoading: false,
 
-    // fetchAvailableItems: async (
-    //   vendorShadowId: number,
-    //   budgetPlanId: number,
-    // ) => {
-    //   set({ availableItemsLoading: true });
-
-    //   try {
-    //     const response = await realizationApprovedBpService.fetchAvailableItems(
-    //       vendorShadowId,
-    //       budgetPlanId,
-    //     );
-
-    //     set({
-    //       availableItems: response.data ?? [],
-    //       availableItemsLoading: false,
-    //     });
-
-    //     return response.data ?? [];
-    //   } catch (error) {
-    //     set({
-    //       availableItems: [],
-    //       availableItemsLoading: false,
-    //     });
-
-    //     throw error;
-    //   }
-    // },
-
     fetchAvailableItems: async (
       vendorShadowId: number,
       budgetPlanId: number,

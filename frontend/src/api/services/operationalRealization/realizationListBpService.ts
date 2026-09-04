@@ -60,6 +60,7 @@ function mapRealizationApprovedBp(
     docDate: formatDocDate(item.docDate),
     makerName: item.makerName,
     isLocked: item.isLocked,
+    allSubmitted: item.allSubmitted,
     vendorName: item.vendorName,
     activities: item.activities,
     purchaseOrderId: item.purchaseOrderId,

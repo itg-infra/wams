@@ -37,6 +37,8 @@ export default function FormWorkOrderScreen() {
   const state = location.state as LocationState;
   const budgetPlan = state?.budgetPlan;
 
+  // const coaname = budgetPlan.activityTypeName; need to confirm resqi
+
   const LIMIT = 10;
   const [page, setPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -94,8 +96,6 @@ export default function FormWorkOrderScreen() {
   } = useWorkOrderController();
 
   const [picUser, setPicUser] = useState<WOPIC | null>(null);
-
-  // const { getDetail } = useWorkOrderStore();
 
   const { files: existingFiles, getWorkOrderFiles } = useFileController();
 
@@ -185,139 +185,6 @@ export default function FormWorkOrderScreen() {
       cancelled = true;
     };
   }, [selectedActivity, budgetPlan.activities]);
-
-  // useEffect(() => {
-  //   if (!selectedActivity) {
-  //     if (budgetPlan.activities.length > 0) {
-  //       setSelectedActivity(budgetPlan.activities[0]);
-  //     }
-  //     return;
-  //   }
-
-  //   const code = selectedActivity.activityTypeCode;
-
-  //   const isTransport = code === "K.BONGKAR" || code === "K.MUAT";
-
-  //   if (selectedActivity.workOrderId === null) return;
-
-  //   const fetchDetail = async () => {
-  //     try {
-  //       const res = await workOrderController.getDetail(
-  //         Number(selectedActivity.workOrderId),
-  //       );
-
-  //       setPicUser({
-  //         id: res.data.picUserId,
-  //         fullname: res.data.picName,
-  //         // email: "",
-  //         // employeeId: null,
-  //         // isActive: true,
-  //         // createdAt: "",
-  //         // roles: [],
-  //         // warehouses: [],
-  //       });
-
-  //       setStartDate(res.data.startDate);
-  //       setEndDate(res.data.endDate);
-  //       setNotes(res.data.notes);
-
-  //       console.log(`pic user: ${picUser?.fullname}`);
-
-  //       console.log(`start date: ${startDate} - end date: ${endDate}`);
-
-  //       const mappedRows = mapWorkOrderDetailToRows(res.data);
-  //       setRows(mappedRows);
-  //     } catch (error) {
-  //       console.error("Gagal mengambil detail work order:", error);
-  //     }
-  //   };
-
-  //   fetchDetail();
-
-  //   // transport activity tunggu pilih TO
-  //   if (isTransport) {
-  //     setRows([]);
-  //     return;
-  //   }
-
-  //   // non transport auto generate 1 row
-  //   setRows([
-  //     {
-  //       id: ++idCounter.current,
-
-  //       source: "budgetPlan",
-
-  //       blNumber: "",
-  //       productName: "",
-  //       quantity: 0,
-  //       uomCode: "",
-
-  //       noVehicle: "",
-  //       noContainer: "",
-  //       noSeal: "",
-
-  //       grossWeight: 0,
-  //       finalWeight: 0,
-  //       nettWeight: 0,
-
-  //       totalBag: 0,
-  //       unitWeight: 0,
-
-  //       fumiId: "",
-  //       totalDuration: "",
-  //       mvName: "",
-
-  //       initialTemperature: 0,
-  //       fumigationType: "",
-  //       finalTemperature: 0,
-
-  //       methylBromideDosage: 0,
-  //       sulphurFluorideDosage: 0,
-  //       phosphineDosage: 0,
-
-  //       result: "",
-
-  //       moisturePercent: 0,
-  //       jamurPercent: 0,
-  //       bauPercent: 0,
-  //       qualityStatus: "",
-
-  //       hasPindahStapel: false,
-  //       hasPembersihan: false,
-  //       hasPerapihan: false,
-
-  //       volumeWeight: 0,
-  //       workerOnDuty: 0,
-
-  //       hasMask: false,
-  //       hasSafetyGlasses: false,
-  //       hasHandGloves: false,
-  //       hasHelmet: false,
-  //       hasSafetyShoes: false,
-  //       hasSafetyVest: false,
-
-  //       receiver: "",
-  //       initialWeight: 0,
-  //       totalWeight: 0,
-
-  //       startTime: "",
-  //       endTime: "",
-  //       standbyDuration1: "",
-  //       standbyDuration2: "",
-  //       minimumDuration: "",
-  //       costPerHour: 0,
-  //       totalCost: 0,
-
-  //       isChecked: false,
-  //       sortOrder: 1,
-  //     },
-  //   ]);
-  // }, [
-  //   budgetPlan.activities,
-  //   getDetail,
-  //   getWorkOrderFiles,
-  //   selectedActivity,
-  // ]);
 
   const { uploadFiles, isUploading } = useFileUploadController();
 
@@ -650,12 +517,6 @@ export default function FormWorkOrderScreen() {
 
       codeBlock: "A3-01",
       notes: notes || null,
-      // gpsLocation: {
-      //   latitude: -6.1077,
-      //   longitude: 106.8811,
-      //   accuracy: 12.5,
-      //   recordedAt: "2026-05-26T07:30:00Z",
-      // },
       gpsLocation: gpsLocation,
     };
 
@@ -787,7 +648,7 @@ export default function FormWorkOrderScreen() {
     }
 
     // ================= ALAT BERAT =================
-    if (selectedActivity?.activityTypeCode === "ALAT BERAT") {
+    if (selectedActivity?.activityTypeCode === "ALAT_BERAT") {
       return {
         ...basePayload,
 
@@ -1013,8 +874,7 @@ export default function FormWorkOrderScreen() {
           }}
         >
           {budgetPlan.activities.map((activity, index) => {
-            // const isActive =
-            //   selectedActivity?.activityTypeCode === activity.activityTypeCode;
+            const isOthers = activity.activityTypeDisplay === "Others";
 
             const isActive =
               selectedActivity?.budgetPlanItemId === activity.budgetPlanItemId;
@@ -1022,7 +882,6 @@ export default function FormWorkOrderScreen() {
             return (
               <button
                 key={activity.budgetPlanItemId}
-                // onClick={() => setSelectedActivity(activity.activityTypeCode)}
                 onClick={() => setSelectedActivity(activity)}
                 className={`
                   relative
@@ -1052,7 +911,7 @@ export default function FormWorkOrderScreen() {
                   boxShadow: "0px -2px 5px rgba(0,0,0,0.08)",
                 }}
               >
-                {activity.activityTypeDisplay}
+                {isOthers ? activity.coaName : activity.activityTypeDisplay}
               </button>
             );
           })}
@@ -1426,6 +1285,146 @@ rounded-[3px]
                           </svg>
                         )}
                       </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {currentConfig.layout === "others" && (
+            <div className="space-y-4">
+              {rows.map((row, idx) => {
+                const radioFields = currentFields.filter(
+                  (f) => f.variant === "radio",
+                );
+                const toolsFields = currentFields.filter(
+                  (f) => f.group === "tools",
+                );
+                const plainFields = currentFields.filter(
+                  (f) => f.variant !== "radio" && f.group !== "tools",
+                );
+
+                return (
+                  <div
+                    key={row.id}
+                    className={idx > 0 ? "pt-4 border-t border-[#c3c9d1]" : ""}
+                  >
+                    {/* RADIO ROW */}
+                    <div className="flex flex-wrap gap-8 mb-4">
+                      {radioFields.map((field) => (
+                        <label
+                          key={field.key}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            checked={Boolean(row[field.key])}
+                            onChange={() =>
+                              handleRowChange(
+                                row.id,
+                                field.key,
+                                !row[field.key],
+                              )
+                            }
+                            className="w-4 h-4 accent-[#3f2b96] cursor-pointer"
+                          />
+                          <span className="text-[13px] font-semibold text-[#2f2f2f]">
+                            {field.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* LEFT: number fields */}
+                      <div className="space-y-4">
+                        {plainFields.map((field) => (
+                          <div key={field.key}>
+                            <label className="block text-[12px] font-semibold text-[#2f2f2f] mb-1">
+                              {field.label}
+                            </label>
+
+                            {field.unit ? (
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  value={
+                                    typeof row[field.key] === "number"
+                                      ? (row[field.key] as number)
+                                      : ""
+                                  }
+                                  onChange={(e) =>
+                                    handleRowChange(
+                                      row.id,
+                                      field.key,
+                                      e.target.value === ""
+                                        ? null
+                                        : Number(e.target.value),
+                                    )
+                                  }
+                                  placeholder="Fill Number"
+                                  className="h-[50px] w-44 rounded-[4px] border border-white bg-white px-3 text-[13px] focus:outline-none focus:border-[#3f2b96]"
+                                />
+                                <div className="h-[50px] w-44 flex items-center px-3 rounded-[4px] border border-white bg-white text-[13px] text-[#2f2f2f]">
+                                  {field.unit}
+                                </div>
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                value={
+                                  typeof row[field.key] === "number"
+                                    ? (row[field.key] as number)
+                                    : ""
+                                }
+                                onChange={(e) =>
+                                  handleRowChange(
+                                    row.id,
+                                    field.key,
+                                    e.target.value === ""
+                                      ? null
+                                      : Number(e.target.value),
+                                  )
+                                }
+                                placeholder="0"
+                                className="h-[50px] w-44 rounded-[4px] border border-white bg-white px-3 text-[13px] focus:outline-none focus:border-[#3f2b96]"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* RIGHT: tools checklist */}
+                      <div>
+                        <p className="text-[12px] font-semibold text-[#2f2f2f] mb-2">
+                          Tools
+                        </p>
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-10 w-fit">
+                          {toolsFields.map((field) => (
+                            <label
+                              key={field.key}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={Boolean(row[field.key])}
+                                onChange={(e) =>
+                                  handleRowChange(
+                                    row.id,
+                                    field.key,
+                                    e.target.checked,
+                                  )
+                                }
+                                className="w-4 h-4 rounded border-[#c5c5c5] text-[#3f2b96] focus:ring-0 cursor-pointer"
+                              />
+                              <span className="text-[13px] text-[#2f2f2f]">
+                                {field.label}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

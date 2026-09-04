@@ -1,7 +1,7 @@
-import axiosProvider from '../../../providers/axiosProvider'; // sesuaikan path
-import type { ApprovedBudgetPlanResponse } from '../../../../types/listGeneratePo.type';
+import axiosProvider from "../../../providers/axiosProvider"; // sesuaikan path
+import type { ApprovedBudgetPlanResponse } from "../../../../types/listGeneratePo.type";
 
-const BASE_URL = 'api/v1/purchase-orders/approved-budget-plans';
+const BASE_URL = "api/v1/purchase-orders/approved-budget-plans";
 
 type LinkedPurchaseOrder = {
   id: number;
@@ -41,6 +41,15 @@ export type PurchaseOrderDetailItem = {
   totalValue: number;
 
   sortOrder: number;
+
+  ppnTaxTypeCode: string;
+  ppnRate: number;
+  pphTaxTypeCode: string;
+  pphRate: number;
+  ppnAmount: number;
+  pphAmount: number;
+  grandTotal: number;
+  costTreatment: string;
 };
 
 export type PurchaseOrderDetail = {
@@ -69,6 +78,21 @@ export type PurchaseOrderDetail = {
 
   generatedAt: string | null;
   generatedByName: string | null;
+  approvers: approverItems[];
+  apdp: apdpItem | null;
+};
+
+export type approverItems = {
+  name: string;
+  approvedAt: string;
+};
+
+export type apdpItem = {
+  status: string;
+  sapDocEntry: string | null;
+  amount: number;
+  generatedAt: string | null;
+  error: string | null;
 };
 
 export type PurchaseOrderDetailResponse = {
