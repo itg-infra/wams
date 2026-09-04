@@ -74,7 +74,8 @@ public record BudgetPlanSummaryResponse(
     DateTime DocDate,
     string Status,
     string StatusDisplay,
-    BudgetPlanApprovalInfo Approval);
+    BudgetPlanApprovalInfo Approval,
+    bool IsRfba = false);
 
 public record WorkflowStageInfo(
     int StageOrder,
@@ -164,7 +165,7 @@ public record BudgetTemplateSummaryInfo(
 /// <c>IBudgetPlanRepository.GetForWoCreateAsync</c>. Carries only the fields needed for
 /// validation + WO construction; avoids the 10-Include AsSplitQuery load.
 /// </summary>
-public record BpItemForWo(long Id, long ItemShadowId, string ActivityTypeCode);
+public record BpItemForWo(long Id, long ItemShadowId, string ActivityTypeCode, bool IsRfba = false);
 
 public record BpForWoCreateProjection(
     long Id,
@@ -172,5 +173,4 @@ public record BpForWoCreateProjection(
     long CompanyId,
     long WarehouseShadowId,
     string TemplateCode,
-    List<BpItemForWo> Items,
-    bool AnyRfba);
+    List<BpItemForWo> Items);

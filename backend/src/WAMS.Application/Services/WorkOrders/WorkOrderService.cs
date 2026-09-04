@@ -136,7 +136,7 @@ public class WorkOrderService(
             ActivityTypeCode = item.ActivityTypeCode,
             WarehouseShadowId = bp.WarehouseShadowId,
             TemplateCode = bp.TemplateCode,
-            IsRfba = bp.AnyRfba,
+            IsRfba = item.IsRfba,
             CompanyId = bp.CompanyId,
             Status = WorkOrderStatus.Draft,
             CreatedByUserId = actorUserId,

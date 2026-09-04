@@ -140,9 +140,9 @@ export default function BudgetPlanScreen() {
       render: (row) => row.makerName ?? "-",
     },
     {
-      key: "approval",
-      header: "Approval",
-      render: (row) => row.isRfba ?? "-",
+      key: "rfba",
+      header: "RFBA",
+      render: (row) => (row.isRfba ? "Yes" : "No"),
     },
     {
       key: "docDate",

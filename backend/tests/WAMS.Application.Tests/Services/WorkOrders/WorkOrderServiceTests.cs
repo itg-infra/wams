@@ -57,7 +57,7 @@ public class WorkOrderServiceTests
     // --- BulkCreateDraftAsync ---
 
     [Fact]
-    public async Task BulkCreateDraftAsync_CreatesStubsForEachBpItem()
+    public async Task BulkCreateDraftAsync_CopiesRfbaPerBpItem()
     {
         var bp = new BpForWoCreateProjection(
             Id: 1,
@@ -67,10 +67,9 @@ public class WorkOrderServiceTests
             TemplateCode: "TPL01",
             Items:
             [
-                new BpItemForWo(Id: 5, ItemShadowId: 11, ActivityTypeCode: "K.GUDANG"),
-                new BpItemForWo(Id: 6, ItemShadowId: 12, ActivityTypeCode: "AT.SPECIFIC"),
-            ],
-            AnyRfba: false);
+                new BpItemForWo(Id: 5, ItemShadowId: 11, ActivityTypeCode: "K.GUDANG", IsRfba: true),
+                new BpItemForWo(Id: 6, ItemShadowId: 12, ActivityTypeCode: "AT.SPECIFIC", IsRfba: false),
+            ]);
 
         _bpRepo.GetForWoCreateAsync(1, Arg.Any<CancellationToken>()).Returns(bp);
         _woRepo.HasActiveWorkOrderForItemAsync(5, Arg.Any<CancellationToken>()).Returns(false);
@@ -83,10 +82,12 @@ public class WorkOrderServiceTests
             Arg.Is<IReadOnlyList<WorkOrder>>(list =>
                 list.Count == 2
                 && list[0].BudgetPlanItemId == 5
+                && list[0].IsRfba
                 && list[0].ActivityTypeCode == "K.GUDANG"
                 && list[0].Code.StartsWith("WO-")
                 && list[0].PicUserId == null
                 && list[1].BudgetPlanItemId == 6
+                && !list[1].IsRfba
                 && list[1].ActivityTypeCode == "AT.SPECIFIC"
                 && list[1].PicUserId == null),
             Arg.Any<CancellationToken>());
@@ -105,8 +106,7 @@ public class WorkOrderServiceTests
             [
                 new BpItemForWo(Id: 5, ItemShadowId: 11, ActivityTypeCode: "K.GUDANG"),
                 new BpItemForWo(Id: 6, ItemShadowId: 12, ActivityTypeCode: "K.GUDANG"),
-            ],
-            AnyRfba: false);
+            ]);
 
         _bpRepo.GetForWoCreateAsync(1, Arg.Any<CancellationToken>()).Returns(bp);
         _woRepo.HasActiveWorkOrderForItemAsync(5, Arg.Any<CancellationToken>()).Returns(true);  // already has WO
@@ -129,8 +129,7 @@ public class WorkOrderServiceTests
             CompanyId: 42,
             WarehouseShadowId: 10,
             TemplateCode: "TPL01",
-            Items: [new BpItemForWo(Id: 5, ItemShadowId: 11, ActivityTypeCode: "K.GUDANG")],
-            AnyRfba: false);
+            Items: [new BpItemForWo(Id: 5, ItemShadowId: 11, ActivityTypeCode: "K.GUDANG")]);
 
         _bpRepo.GetForWoCreateAsync(1, Arg.Any<CancellationToken>()).Returns(bp);
         _woRepo.HasActiveWorkOrderForItemAsync(5, Arg.Any<CancellationToken>()).Returns(true);
@@ -527,8 +526,7 @@ public class WorkOrderServiceTests
         CompanyId: 42,
         WarehouseShadowId: 1,
         TemplateCode: "TPL01",
-        Items: [new BpItemForWo(Id: 10, ItemShadowId: 1, ActivityTypeCode: "K.GUDANG")],
-        AnyRfba: false);
+        Items: [new BpItemForWo(Id: 10, ItemShadowId: 1, ActivityTypeCode: "K.GUDANG")]);
 
     private static WorkOrderResponse MakeWorkOrderResponse() => new(
         Id: 1,

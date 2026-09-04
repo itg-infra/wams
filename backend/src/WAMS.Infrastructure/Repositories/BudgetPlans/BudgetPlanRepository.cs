@@ -89,6 +89,7 @@ public class BudgetPlanRepository(
         var colMakerName = reader.GetOrdinal("maker_name");
         var colDocDate = reader.GetOrdinal("doc_date");
         var colStatus = reader.GetOrdinal("status");
+        var colIsRfba = reader.GetOrdinal("is_rfba");
         var colTotalStages = reader.GetOrdinal("total_stages");
         var colCurrentStage = reader.GetOrdinal("current_stage_order");
         var colStagesJson = reader.GetOrdinal("stages_json");
@@ -116,7 +117,8 @@ public class BudgetPlanRepository(
                 reader.GetDateTime(colDocDate),
                 statusStr,
                 statusDisplay,
-                new BudgetPlanApprovalInfo(totalStages, currentStage, stages)));
+                new BudgetPlanApprovalInfo(totalStages, currentStage, stages),
+                reader.GetBoolean(colIsRfba)));
         }
 
         return (items, total);
@@ -150,6 +152,7 @@ public class BudgetPlanRepository(
         var colMakerName = reader.GetOrdinal("maker_name");
         var colDocDate = reader.GetOrdinal("doc_date");
         var colStatus = reader.GetOrdinal("status");
+        var colIsRfba = reader.GetOrdinal("is_rfba");
         var colTotalStages = reader.GetOrdinal("total_stages");
         var colCurrentStage = reader.GetOrdinal("current_stage_order");
         var colStagesJson = reader.GetOrdinal("stages_json");
@@ -177,7 +180,8 @@ public class BudgetPlanRepository(
                 reader.GetDateTime(colDocDate),
                 statusStr,
                 statusDisplay,
-                new BudgetPlanApprovalInfo(totalStages, currentStage, stages));
+                new BudgetPlanApprovalInfo(totalStages, currentStage, stages),
+                reader.GetBoolean(colIsRfba));
         }
     }
 
@@ -197,6 +201,12 @@ public class BudgetPlanRepository(
             cu.""Fullname"" AS maker_name,
             bp.doc_date,
             bp.status,
+            EXISTS (
+                SELECT 1
+                FROM budget_plan_items bpi_rfba
+                WHERE bpi_rfba.budget_plan_id = bp.""Id""
+                  AND bpi_rfba.is_rfba = TRUE
+            ) AS is_rfba,
             wi.total_stages,
             wi.current_stage_order,
             wi.stages_json
@@ -308,6 +318,12 @@ public class BudgetPlanRepository(
             cu.""Fullname"" AS maker_name,
             bp.doc_date,
             bp.status,
+            EXISTS (
+                SELECT 1
+                FROM budget_plan_items bpi_rfba
+                WHERE bpi_rfba.budget_plan_id = bp.""Id""
+                  AND bpi_rfba.is_rfba = TRUE
+            ) AS is_rfba,
             wi.total_stages,
             wi.current_stage_order,
             wi.stages_json
@@ -460,7 +476,6 @@ public class BudgetPlanRepository(
                 b.CompanyId,
                 b.WarehouseShadowId,
                 TemplateCode = b.BudgetTemplate.Code,
-                AnyRfba = b.Items.Any(i => i.IsRfba),
             })
             .FirstOrDefaultAsync(ct);
 
@@ -469,7 +484,7 @@ public class BudgetPlanRepository(
         var items = await db.BudgetPlanItems
             .AsNoTracking()
             .Where(i => i.BudgetPlanId == id)
-            .Select(i => new { i.Id, i.ItemShadowId, AtCode = i.ActivityType!.Code })
+            .Select(i => new { i.Id, i.ItemShadowId, AtCode = i.ActivityType!.Code, i.IsRfba })
             .ToListAsync(ct);
 
         return new BpForWoCreateProjection(
@@ -478,8 +493,7 @@ public class BudgetPlanRepository(
             header.CompanyId,
             header.WarehouseShadowId,
             header.TemplateCode,
-            items.Select(i => new BpItemForWo(i.Id, i.ItemShadowId, i.AtCode)).ToList(),
-            header.AnyRfba);
+            items.Select(i => new BpItemForWo(i.Id, i.ItemShadowId, i.AtCode, i.IsRfba)).ToList());
     }
 
     public async Task<BudgetPlanResponse?> GetByIdProjectionAsync(long id, CancellationToken ct = default)
