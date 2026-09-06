@@ -9,6 +9,11 @@ import type { TransportOrder } from "../master_data/types/transport.types";
 import { useWorkOrderController } from "../controllers/operationalRealization/createWorkorderControllert";
 import { ACTIVITY_CONFIG, type FieldConfig } from "../config/activityWoConfig";
 import {
+  getWorkOrderActivityDefinition,
+  getWorkOrderActivityLabel,
+} from "../config/workOrderActivityDefinitions";
+import { buildWorkOrderDetailPayload } from "../utils/workOrderDetailPayload";
+import {
   createEmptyRow,
   type WorkOrderRow,
 } from "../config/workOrderRowConfig";
@@ -109,6 +114,10 @@ export default function FormWorkOrderScreen() {
   >(null);
 
   const workOrderCode = selectedActivity?.workOrderCode ?? null;
+
+  const activityDefinition = selectedActivity
+    ? getWorkOrderActivityDefinition(selectedActivity.activityTypeCode)
+    : null;
 
   const workOrderId = selectedActivity?.workOrderId;
 
@@ -213,6 +222,10 @@ export default function FormWorkOrderScreen() {
 
   const handleCreateWo = async () => {
     try {
+      if (!activityDefinition || !selectedActivity) {
+        toast.error(`Unsupported work order activity: ${selectedActivity?.activityTypeCode ?? "unknown"}`);
+        return;
+      }
       const location = await getCurrentLocation();
 
       const payload = buildPayload({
@@ -249,6 +262,10 @@ export default function FormWorkOrderScreen() {
 
   const handleDraftWo = async () => {
     try {
+      if (!activityDefinition || !selectedActivity) {
+        toast.error(`Unsupported work order activity: ${selectedActivity?.activityTypeCode ?? "unknown"}`);
+        return;
+      }
       const location = await getCurrentLocation();
 
       const payload = buildPayload({
@@ -507,247 +524,36 @@ export default function FormWorkOrderScreen() {
     accuracy: number;
     recordedAt: string;
   }) => {
+    if (!selectedActivity || !activityDefinition) {
+      throw new Error(
+        `Unsupported work order activity: ${selectedActivity?.activityTypeCode ?? "unknown"}`,
+      );
+    }
+
     const basePayload = {
       budgetPlanId: budgetPlan.budgetPlanId,
-      budgetPlanItemId: selectedActivity?.budgetPlanItemId,
+      budgetPlanItemId: selectedActivity.budgetPlanItemId,
       picUserId: picUser?.id,
-
       startDate,
       endDate,
-
       codeBlock: "A3-01",
       notes: notes || null,
-      gpsLocation: gpsLocation,
+      gpsLocation,
     };
 
-    const row = rows[0];
-
-    // ================= BONGKAR =================
-    if (selectedActivity?.activityTypeCode === "K.BONGKAR") {
-      return {
-        ...basePayload,
-
-        unloadingItems: rows.map((row, index) => ({
-          blNumber: row.blNumber,
-          productName: row.productName,
-
-          quantity: Number(row.quantity),
-          uomCode: row.uomCode,
-
-          noVehicle: row.noVehicle,
-          noContainer: row.noContainer,
-          noSeal: row.noSeal,
-
-          grossWeight: Number(row.grossWeight),
-          finalWeight: Number(row.finalWeight),
-          nettWeight: Number(row.nettWeight),
-
-          totalBag: Number(row.totalBag),
-          unitWeight: Number(row.unitWeight),
-
-          isChecked: row.isChecked,
-          sortOrder: index + 1,
-        })),
-      };
-    }
-
-    // ================= MUAT =================
-    if (selectedActivity?.activityTypeCode === "K.MUAT") {
-      return {
-        ...basePayload,
-
-        loadingItems: rows.map((row, index) => ({
-          // spkShadowId: null,
-
-          blNumber: row.blNumber,
-          productName: row.productName,
-
-          quantity: Number(row.quantity),
-          uomCode: row.uomCode,
-
-          noVehicle: row.noVehicle,
-          noContainer: row.noContainer,
-          noSeal: row.noSeal,
-
-          grossWeight: Number(row.grossWeight),
-          finalWeight: Number(row.finalWeight),
-          nettWeight: Number(row.nettWeight),
-
-          totalBag: Number(row.totalBag),
-          unitWeight: Number(row.unitWeight),
-
-          isChecked: row.isChecked,
-          sortOrder: index + 1,
-        })),
-      };
-    }
-
-    // ================= FUMIGASI =================
-    if (selectedActivity?.activityTypeCode === "FUMIGASI") {
-      return {
-        ...basePayload,
-
-        fumigation: {
-          fumiId: row?.fumiId || "",
-          totalDuration: row?.totalDuration || "",
-
-          blNumber: row?.blNumber || "",
-
-          mvName: row?.mvName || "",
-
-          initialTemperature: Number(row?.initialTemperature || 0),
-          finalTemperature: Number(row?.finalTemperature || 0),
-
-          fumigationType: row?.fumigationType || "",
-
-          methylBromideDosage: row?.methylBromideDosage ?? null,
-          sulphurFluorideDosage: row?.sulphurFluorideDosage ?? null,
-          phosphineDosage: Number(row?.phosphineDosage || 0),
-
-          result: row?.result || "",
-        },
-      };
-    }
-
-    // ================= K.GUDANG =================
-    if (selectedActivity?.activityTypeCode === "K.GUDANG") {
-      return {
-        ...basePayload,
-
-        storage: {
-          hasPindahStapel: row?.hasPindahStapel ?? false,
-          hasPembersihan: row?.hasPembersihan ?? false,
-          hasPerapihan: row?.hasPerapihan ?? false,
-
-          volumeWeight: Number(row?.volumeWeight || 0),
-          workerOnDuty: Number(row?.workerOnDuty || 0),
-
-          hasMask: row?.hasMask ?? false,
-          hasSafetyGlasses: row?.hasSafetyGlasses ?? false,
-          hasHandGloves: row?.hasHandGloves ?? false,
-          hasHelmet: row?.hasHelmet ?? false,
-          hasSafetyShoes: row?.hasSafetyShoes ?? false,
-          hasSafetyVest: row?.hasSafetyVest ?? false,
-        },
-      };
-    }
-
-    // ================= QC =================
-    if (selectedActivity?.activityTypeCode === "QC") {
-      return {
-        ...basePayload,
-
-        qc: {
-          moisturePercent: Number(row?.moisturePercent || 0),
-          jamurPercent: Number(row?.jamurPercent || 0),
-          bauPercent: Number(row?.bauPercent || 0),
-
-          qualityStatus: row?.qualityStatus || "",
-        },
-      };
-    }
-
-    // ================= ALAT BERAT =================
-    if (selectedActivity?.activityTypeCode === "ALAT_BERAT") {
-      return {
-        ...basePayload,
-
-        heavyEquipment: {
-          blNumber: row?.blNumber || "",
-
-          startTime: row?.startTime || "",
-          endTime: row?.endTime || "",
-
-          standbyDuration1: row?.standbyDuration1 || "",
-          standbyDuration2: row?.standbyDuration2 || "",
-
-          minimumDuration: row?.minimumDuration || "",
-
-          costPerHour: Number(row?.costPerHour || 0),
-          totalCost: Number(row?.totalCost || 0),
-        },
-      };
-    }
-
-    // ================= UNBAGGING =================
-    if (selectedActivity?.activityTypeCode === "UNBAGGING") {
-      return {
-        ...basePayload,
-
-        unbagging: {
-          noVehicle: row?.noVehicle || "",
-          noContainer: row?.noContainer || "",
-          noSeal: row?.noSeal || "",
-
-          initialWeight: Number(row?.initialWeight || 0),
-
-          totalBag: Number(row?.totalBag || 0),
-
-          finalWeight: Number(row?.finalWeight || 0),
-
-          unitWeight: Number(row?.unitWeight || 0),
-
-          totalWeight: Number(row?.totalWeight || 0),
-        },
-      };
-    }
-
-    // ================= REBAGGING =================
-    if (selectedActivity?.activityTypeCode === "REBAGGING") {
-      return {
-        ...basePayload,
-
-        rebagging: {
-          receiver: row?.receiver || "",
-
-          noVehicle: row?.noVehicle || "",
-          noContainer: row?.noContainer || "",
-          noSeal: row?.noSeal || "",
-
-          initialWeight: Number(row?.initialWeight || 0),
-
-          finalWeight: Number(row?.finalWeight || 0),
-
-          totalWeight: Number(row?.totalWeight || 0),
-        },
-      };
-    }
-
-    // ================= OTHERS =================
-    if (selectedActivity?.activityTypeCode === "OTHERS") {
-      return {
-        ...basePayload,
-        // Sesuaikan nama key 'others' di bawah ini dengan struktur JSON
-        // yang diminta oleh API untuk endpoint POST/PUT Work Order
-        others: {
-          hasPindahStapel: row?.hasPindahStapel ?? false,
-          hasPembersihan: row?.hasPembersihan ?? false,
-          hasPerapihan: row?.hasPerapihan ?? false,
-
-          volumeWeight: Number(row?.volumeWeight || 0),
-          workerOnDuty: Number(row?.workerOnDuty || 0),
-
-          hasMask: row?.hasMask ?? false,
-          hasSafetyGlasses: row?.hasSafetyGlasses ?? false,
-          hasHandGloves: row?.hasHandGloves ?? false,
-          hasHelmet: row?.hasHelmet ?? false,
-          hasSafetyShoes: row?.hasSafetyShoes ?? false,
-          hasSafetyVest: row?.hasSafetyVest ?? false,
-        },
-      };
-    }
-
-    return basePayload;
+    return {
+      ...basePayload,
+      ...buildWorkOrderDetailPayload(selectedActivity.activityTypeCode, rows),
+    };
   };
 
   const isTransportActivity =
     selectedActivity?.activityTypeCode === "K.BONGKAR" ||
     selectedActivity?.activityTypeCode === "K.MUAT";
 
-  const currentConfig =
-    ACTIVITY_CONFIG[selectedActivity?.activityTypeCode || ""];
-
-  console.log(selectedActivity?.activityTypeCode);
+  const currentConfig = selectedActivity && activityDefinition
+    ? ACTIVITY_CONFIG[selectedActivity.activityTypeCode]
+    : undefined;
 
   const currentFields = currentConfig?.fields || [];
 
@@ -874,8 +680,6 @@ export default function FormWorkOrderScreen() {
           }}
         >
           {budgetPlan.activities.map((activity, index) => {
-            const isOthers = activity.activityTypeDisplay === "Others";
-
             const isActive =
               selectedActivity?.budgetPlanItemId === activity.budgetPlanItemId;
 
@@ -911,7 +715,10 @@ export default function FormWorkOrderScreen() {
                   boxShadow: "0px -2px 5px rgba(0,0,0,0.08)",
                 }}
               >
-                {isOthers ? activity.coaName : activity.activityTypeDisplay}
+                {getWorkOrderActivityLabel(
+                  activity.activityTypeCode,
+                  activity.coaName,
+                )}
               </button>
             );
           })}
@@ -1714,7 +1521,7 @@ bg-[#F7F7F7]
             variant="secondary"
             size="lg"
             onClick={handleDraftWo}
-            disabled={isDrafting}
+            disabled={isDrafting || !activityDefinition}
             type="button"
             className="w-full sm:w-auto min-w-28.5"
           >
@@ -1726,7 +1533,7 @@ bg-[#F7F7F7]
             variant="primary"
             size="lg"
             onClick={handleCreateWo}
-            disabled={isSubmitting || isUploading}
+            disabled={isSubmitting || isUploading || !activityDefinition}
             className="w-full sm:w-auto"
           >
             {isSubmitting

@@ -5,7 +5,7 @@ export interface GpsLocation {
   recordedAt: string;
 }
 
-export interface StorageItem {
+export interface StorageHandlingDetail {
   hasPindahStapel: boolean;
   hasPembersihan: boolean;
   hasPerapihan: boolean;
@@ -166,7 +166,9 @@ export interface WorkOrderDetail {
 
   fumigation: FumigationItem | null;
 
-  storage: StorageItem | null;
+  storage: StorageHandlingDetail | null;
+  opname: StorageHandlingDetail | null;
+  others: StorageHandlingDetail | null;
   qc: QcItem | null;
   heavyEquipment: HeavyEquipmentItem | null;
   unbagging: UnbaggingItem | null;

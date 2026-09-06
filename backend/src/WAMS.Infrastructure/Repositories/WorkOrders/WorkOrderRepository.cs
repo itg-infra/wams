@@ -336,10 +336,8 @@ public class WorkOrderRepository(
 
     public async Task<WorkOrderResponse?> GetByIdProjectionAsync(long id, CancellationToken ct = default)
     {
-        // EF Core ≥8 compiles nested collection projections into a single SQL using PostgreSQL
-        // JSON aggregation (json_agg), so this entire response shape comes back in ONE round-trip.
-        // Conditional details (FumigationDetail, StorageDetail, etc.) compile to a CASE that
-        // skips the LEFT JOIN body when the activity type doesn't match.
+        // Keep the root/detail projection scalar so it remains provider-neutral; collection
+        // details are loaded in focused queries below.
         var row = await db.WorkOrders
             .AsNoTracking()
             .Where(w => w.Id == id)
@@ -360,11 +358,6 @@ public class WorkOrderRepository(
                 WarehouseCode = w.BudgetPlan.Warehouse.Code,
                 WarehouseName = w.BudgetPlan.Warehouse.Name,
                 w.TemplateCode,
-                VendorNames = w.BudgetPlan.Items
-                    .Select(i => i.Vendor.CardName)
-                    .Distinct()
-                    .OrderBy(n => n)
-                    .ToList(),
                 w.CodeBlock,
                 w.PicUserId,
                 PicName = w.PicUser != null ? w.PicUser.Fullname : null,
@@ -374,39 +367,6 @@ public class WorkOrderRepository(
                 Status = w.Status.Value,
                 w.Notes,
                 Gps = w.GpsLocation,
-                Spk = w.BudgetPlan.SpkItems
-                    .OrderBy(s => s.SortOrder)
-                    .Select(s => new
-                    {
-                        s.Spk.ItemName,
-                        s.Spk.Quantity,
-                        s.Spk.UoM,
-                        s.Spk.BlNo,
-                        s.Spk.CardName,
-                    })
-                    .FirstOrDefault(),
-                TransportOrders = w.TransportOrders
-                    .Select(t => new TransportOrderRef(
-                        t.TransportOrderShadowId,
-                        t.TransportOrderShadow.DocNo,
-                        t.TransportOrderShadow.Type,
-                        t.TransportOrderShadow.VehicleNo,
-                        t.TransportOrderShadow.CardName))
-                    .ToList(),
-                UnloadingItems = w.ActivityTypeCode == ActivityTypeCodes.Bongkar && w.UnloadingItems.Count > 0
-                    ? w.UnloadingItems.OrderBy(i => i.SortOrder).Select(i => new WorkOrderUnloadingItemResponse(
-                        i.Id, i.BlNumber, i.ProductName, i.Quantity, i.UomCode,
-                        i.NoVehicle, i.NoContainer, i.NoSeal,
-                        i.GrossWeight, i.FinalWeight, i.NettWeight,
-                        i.TotalBag, i.UnitWeight, i.IsChecked, i.SortOrder)).ToList()
-                    : null,
-                LoadingItems = w.ActivityTypeCode == ActivityTypeCodes.Muat && w.LoadingItems.Count > 0
-                    ? w.LoadingItems.OrderBy(i => i.SortOrder).Select(i => new WorkOrderLoadingItemResponse(
-                        i.Id, i.BlNumber, i.ProductName, i.Quantity, i.UomCode,
-                        i.NoVehicle, i.NoContainer, i.NoSeal,
-                        i.GrossWeight, i.FinalWeight, i.NettWeight,
-                        i.TotalBag, i.UnitWeight, i.IsChecked, i.SortOrder)).ToList()
-                    : null,
                 Fumigation = w.ActivityTypeCode == ActivityTypeCodes.Fumigasi && w.FumigationDetail != null
                     ? new WorkOrderFumigationDetailResponse(
                         w.FumigationDetail.FumiId, w.FumigationDetail.TotalDuration,
@@ -417,8 +377,21 @@ public class WorkOrderRepository(
                         w.FumigationDetail.PhosphineDosage, w.FumigationDetail.Result)
                     : null,
                 Storage = (w.ActivityTypeCode == ActivityTypeCodes.Gudang
-                           || w.ActivityTypeCode == ActivityTypeCodes.Opname
-                           || w.ActivityTypeCode == ActivityTypeCodes.Others) && w.StorageDetail != null
+                           && w.StorageDetail != null)
+                    ? new WorkOrderStorageDetailResponse(
+                        w.StorageDetail.HasPindahStapel, w.StorageDetail.HasPembersihan, w.StorageDetail.HasPerapihan,
+                        w.StorageDetail.VolumeWeight, w.StorageDetail.WorkerOnDuty,
+                        w.StorageDetail.HasMask, w.StorageDetail.HasSafetyGlasses, w.StorageDetail.HasHandGloves,
+                        w.StorageDetail.HasHelmet, w.StorageDetail.HasSafetyShoes, w.StorageDetail.HasSafetyVest)
+                    : null,
+                Opname = w.ActivityTypeCode == ActivityTypeCodes.Opname && w.StorageDetail != null
+                    ? new WorkOrderStorageDetailResponse(
+                        w.StorageDetail.HasPindahStapel, w.StorageDetail.HasPembersihan, w.StorageDetail.HasPerapihan,
+                        w.StorageDetail.VolumeWeight, w.StorageDetail.WorkerOnDuty,
+                        w.StorageDetail.HasMask, w.StorageDetail.HasSafetyGlasses, w.StorageDetail.HasHandGloves,
+                        w.StorageDetail.HasHelmet, w.StorageDetail.HasSafetyShoes, w.StorageDetail.HasSafetyVest)
+                    : null,
+                Others = w.ActivityTypeCode == ActivityTypeCodes.Others && w.StorageDetail != null
                     ? new WorkOrderStorageDetailResponse(
                         w.StorageDetail.HasPindahStapel, w.StorageDetail.HasPembersihan, w.StorageDetail.HasPerapihan,
                         w.StorageDetail.VolumeWeight, w.StorageDetail.WorkerOnDuty,
@@ -459,9 +432,58 @@ public class WorkOrderRepository(
 
         if (row is null) return null;
 
-        var vendorName = row.VendorNames.Count > 0 ? string.Join(", ", row.VendorNames) : null;
-        var transportOrders = row.TransportOrders.Count > 0
-            ? row.TransportOrders.DistinctBy(t => t.ShadowId).ToList()
+        var vendorNames = await db.BudgetPlanItems
+            .Where(i => i.BudgetPlanId == row.BudgetPlanId)
+            .Select(i => i.Vendor.CardName)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToListAsync(ct);
+        var vendorName = vendorNames.Count > 0 ? string.Join(", ", vendorNames) : null;
+        var spk = await db.BudgetPlanSpkItems
+            .Where(s => s.BudgetPlanId == row.BudgetPlanId)
+            .OrderBy(s => s.SortOrder)
+            .Select(s => new
+            {
+                s.Spk.ItemName,
+                s.Spk.Quantity,
+                s.Spk.UoM,
+                s.Spk.BlNo,
+                s.Spk.CardName,
+            })
+            .FirstOrDefaultAsync(ct);
+        var transportOrders = await db.WorkOrderTransportOrders
+            .Where(t => t.WorkOrderId == row.Id)
+            .Select(t => new TransportOrderRef(
+                t.TransportOrderShadowId,
+                t.TransportOrderShadow.DocNo,
+                t.TransportOrderShadow.Type,
+                t.TransportOrderShadow.VehicleNo,
+                t.TransportOrderShadow.CardName))
+            .ToListAsync(ct);
+        transportOrders = transportOrders.Count > 0
+            ? transportOrders.DistinctBy(t => t.ShadowId).ToList()
+            : null;
+        var unloadingItems = row.ActivityTypeCode == ActivityTypeCodes.Bongkar
+            ? await db.WorkOrderUnloadingItems
+                .Where(i => i.WorkOrderId == row.Id)
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new WorkOrderUnloadingItemResponse(
+                    i.Id, i.BlNumber, i.ProductName, i.Quantity, i.UomCode,
+                    i.NoVehicle, i.NoContainer, i.NoSeal,
+                    i.GrossWeight, i.FinalWeight, i.NettWeight,
+                    i.TotalBag, i.UnitWeight, i.IsChecked, i.SortOrder))
+                .ToListAsync(ct)
+            : null;
+        var loadingItems = row.ActivityTypeCode == ActivityTypeCodes.Muat
+            ? await db.WorkOrderLoadingItems
+                .Where(i => i.WorkOrderId == row.Id)
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new WorkOrderLoadingItemResponse(
+                    i.Id, i.BlNumber, i.ProductName, i.Quantity, i.UomCode,
+                    i.NoVehicle, i.NoContainer, i.NoSeal,
+                    i.GrossWeight, i.FinalWeight, i.NettWeight,
+                    i.TotalBag, i.UnitWeight, i.IsChecked, i.SortOrder))
+                .ToListAsync(ct)
             : null;
 
         return new WorkOrderResponse(
@@ -488,16 +510,18 @@ public class WorkOrderRepository(
             row.Notes,
             row.Gps is null ? null : new GpsLocationResponse(
                 row.Gps.Latitude, row.Gps.Longitude, row.Gps.Accuracy, row.Gps.RecordedAt),
-            row.Spk?.ItemName,
-            row.Spk?.Quantity,
-            row.Spk?.UoM,
-            row.Spk?.BlNo,
-            row.Spk?.CardName,
+            spk?.ItemName,
+            spk?.Quantity,
+            spk?.UoM,
+            spk?.BlNo,
+            spk?.CardName,
             transportOrders,
-            row.UnloadingItems,
-            row.LoadingItems,
+            unloadingItems,
+            loadingItems,
             row.Fumigation,
             row.Storage,
+            row.Opname,
+            row.Others,
             row.Qc,
             row.HeavyEquip,
             row.Unbagging,

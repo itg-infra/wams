@@ -1,3 +1,5 @@
+import type { StorageHandlingDetailPayload } from "./createWorkOrder.type";
+
 export type EditWorkOrderItemPayload = {
   itemShadowId?: number;
 
@@ -28,11 +30,17 @@ export type EditWorkOrderPayload = {
 
   picUserId?: number;
 
-  startDate: string;
-  endDate: string;
+  startDate: string | null;
+  endDate: string | null;
 
   codeBlock: string;
   notes: string | null;
+  gpsLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    recordedAt: string;
+  };
 
   // ================= TRANSPORT =================
   unloadingItems?: EditWorkOrderItemPayload[];
@@ -62,21 +70,9 @@ export type EditWorkOrderPayload = {
   };
 
   // ================= STORAGE =================
-  storage?: {
-    hasPindahStapel: boolean;
-    hasPembersihan: boolean;
-    hasPerapihan: boolean;
-
-    volumeWeight: number;
-    workerOnDuty: number;
-
-    hasMask: boolean;
-    hasSafetyGlasses: boolean;
-    hasHandGloves: boolean;
-    hasHelmet: boolean;
-    hasSafetyShoes: boolean;
-    hasSafetyVest: boolean;
-  };
+  storage?: StorageHandlingDetailPayload;
+  opname?: StorageHandlingDetailPayload;
+  others?: StorageHandlingDetailPayload;
 
   // ================= QC =================
   qc?: {

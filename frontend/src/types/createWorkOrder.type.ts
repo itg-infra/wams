@@ -23,6 +23,20 @@ export type CreateWorkOrderItemPayload = {
   sortOrder: number;
 };
 
+export type StorageHandlingDetailPayload = {
+  hasPindahStapel: boolean;
+  hasPembersihan: boolean;
+  hasPerapihan: boolean;
+  volumeWeight: number;
+  workerOnDuty: number;
+  hasMask: boolean;
+  hasSafetyGlasses: boolean;
+  hasHandGloves: boolean;
+  hasHelmet: boolean;
+  hasSafetyShoes: boolean;
+  hasSafetyVest: boolean;
+};
+
 export type CreateWorkOrderPayload = {
   budgetPlanId: number;
   itemShadowId?: number;
@@ -34,6 +48,12 @@ export type CreateWorkOrderPayload = {
 
   codeBlock: string;
   notes: string | null;
+  gpsLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    recordedAt: string;
+  };
 
   // ================= TRANSPORT =================
   unloadingItems?: CreateWorkOrderItemPayload[];
@@ -63,21 +83,9 @@ export type CreateWorkOrderPayload = {
   };
 
   // ================= STORAGE =================
-  storage?: {
-    hasPindahStapel: boolean;
-    hasPembersihan: boolean;
-    hasPerapihan: boolean;
-
-    volumeWeight: number;
-    workerOnDuty: number;
-
-    hasMask: boolean;
-    hasSafetyGlasses: boolean;
-    hasHandGloves: boolean;
-    hasHelmet: boolean;
-    hasSafetyShoes: boolean;
-    hasSafetyVest: boolean;
-  };
+  storage?: StorageHandlingDetailPayload;
+  opname?: StorageHandlingDetailPayload;
+  others?: StorageHandlingDetailPayload;
 
   // ================= QC =================
   qc?: {

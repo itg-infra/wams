@@ -11,9 +11,14 @@ import {
 } from "../config/workOrderRowConfig";
 import { useTransportOrderController } from "../master_data/controller/transportController";
 import {
-  ACTIVITY_CONFIG_EDIT,
+  ACTIVITY_CONFIG,
   type FieldConfig,
 } from "../config/activityWoConfig";
+import {
+  getWorkOrderActivityDefinition,
+  getWorkOrderActivityLabel,
+} from "../config/workOrderActivityDefinitions";
+import { mapWorkOrderDetailToRows } from "../types/workOrderMapper";
 import { useFileUploadController } from "../controllers/file/fileUploadController";
 import { useWorkOrderController } from "../controllers/operationalRealization/createWorkorderControllert";
 import toast from "react-hot-toast";
@@ -26,7 +31,6 @@ export default function FormEditWoScreen() {
   const navigate = useNavigate();
   const { getDetail, data, isLoading, error } = useWorkOrderStore();
 
-  const [activeTab, setActiveTab] = useState("Unloading");
   const [notes, setNotes] = useState<string>("");
 
   const [rows, setRows] = useState<WorkOrderRow[]>([]);
@@ -101,106 +105,11 @@ export default function FormEditWoScreen() {
   useEffect(() => {
     if (!data) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate fetched data into form state
     setNotes(data.notes ?? "");
 
-    switch (activeTab) {
-      case "Unloading":
-        setRows(
-          (data.unloadingItems ?? []).map((item) => ({
-            ...createEmptyRow(item.id),
-            ...item,
-          })),
-        );
-        break;
-
-      case "Loading":
-        setRows(
-          (data.loadingItems ?? []).map((item) => ({
-            ...createEmptyRow(item.id),
-            ...item,
-          })),
-        );
-        break;
-
-      case "Fumigation":
-        setRows(
-          data.fumigation
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.fumigation,
-                },
-              ]
-            : [],
-        );
-        break;
-
-      case "Storage":
-        setRows(
-          data.storage
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.storage,
-                },
-              ]
-            : [],
-        );
-        break;
-
-      case "QC":
-        setRows(
-          data.qc
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.qc,
-                },
-              ]
-            : [],
-        );
-        break;
-
-      case "Heavy Equipment":
-        setRows(
-          data.heavyEquipment
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.heavyEquipment,
-                },
-              ]
-            : [],
-        );
-        break;
-
-      case "Unbagging":
-        setRows(
-          data.unbagging
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.unbagging,
-                },
-              ]
-            : [],
-        );
-        break;
-
-      case "Rebagging":
-        setRows(
-          data.rebagging
-            ? [
-                {
-                  ...createEmptyRow(1),
-                  ...data.rebagging,
-                },
-              ]
-            : [],
-        );
-        break;
-    }
-  }, [data, activeTab]);
+    setRows(mapWorkOrderDetailToRows(data));
+  }, [data]);
 
   useEffect(() => {
     if (id) getDetail(Number(id));
@@ -208,11 +117,14 @@ export default function FormEditWoScreen() {
 
   const handleDraft = async () => {
     try {
+      if (!data || !definition) {
+        toast.error(`Unsupported work order activity: ${data?.activityTypeCode ?? "unknown"}`);
+        return;
+      }
       const payload = buildWorkOrderPayload({
         data,
         rows,
-        // itemShadowId,
-        activeTab,
+        activityTypeCode: data.activityTypeCode,
         notes,
       });
       const response = await editWorkOrder(Number(id), payload);
@@ -232,14 +144,20 @@ export default function FormEditWoScreen() {
 
   const handleSubmitFromDraft = async () => {
     try {
+      if (!data || !definition) {
+        toast.error(`Unsupported work order activity: ${data?.activityTypeCode ?? "unknown"}`);
+        return;
+      }
+
       const payload = buildWorkOrderPayload({
         data,
         rows,
-        activeTab,
-        // itemShadowId,
+        activityTypeCode: data.activityTypeCode,
         notes,
       });
+
       await editWorkOrder(Number(id), payload);
+
       const response = await submitDraftWorkOrder(Number(id));
 
       const workOrderId = response.data.id;
@@ -331,7 +249,12 @@ export default function FormEditWoScreen() {
   //   );
   // };
 
-  const currentConfig = ACTIVITY_CONFIG_EDIT[activeTab || ""];
+  const definition = data
+    ? getWorkOrderActivityDefinition(data.activityTypeCode)
+    : null;
+  const currentConfig = data
+    ? ACTIVITY_CONFIG[data.activityTypeCode]
+    : undefined;
 
   const currentFields = currentConfig?.fields || [];
 
@@ -449,7 +372,7 @@ export default function FormEditWoScreen() {
   };
 
   const isTransportActivity =
-    activeTab === "Unloading" || activeTab === "Loading";
+    data?.activityTypeCode === "K.BONGKAR" || data?.activityTypeCode === "K.MUAT";
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -484,43 +407,6 @@ export default function FormEditWoScreen() {
   if (error) return <div>{error}</div>;
   if (!data) return <div>Data not found</div>;
 
-  const tabs = [
-    {
-      key: "Unloading",
-      data: data.unloadingItems,
-    },
-    {
-      key: "Loading",
-      data: data.loadingItems,
-    },
-    {
-      key: "Fumigation",
-      data: data.fumigation,
-    },
-    {
-      key: "Storage",
-      data: data.storage,
-    },
-    {
-      key: "QC",
-      data: data.qc,
-    },
-    {
-      key: "Heavy Equipment",
-      data: data.heavyEquipment,
-    },
-    {
-      key: "Unbagging",
-      data: data.unbagging,
-    },
-    {
-      key: "Rebagging",
-      data: data.rebagging,
-    },
-  ];
-
-  //   const activeTabData = tabs.find((tab) => tab.key === activeTab)
-  //     ?.data as UnloadingItem[];
   return (
     <div className="flex-1 space-y-4 md:space-y-6 p-4 sm:p-6 lg:p-8 overflow-y-auto">
       {/* Header */}
@@ -533,28 +419,17 @@ export default function FormEditWoScreen() {
       <div>
         {/* Tab Header */}
         <div className="relative z-10 flex overflow-x-auto px-2 md:px-4 scrollbar-hide">
-          {tabs.map((tab) => (
+          {definition && (
             <button
-              key={tab.key}
-              onClick={() => {
-                console.log(
-                  "clicked:",
-                  tab.key,
-                  "current activeTab:",
-                  activeTab,
-                  tab.data,
-                );
-                setActiveTab(tab.key);
-              }}
-              className={`min-w-fit whitespace-nowrap rounded-t-[24px] border border-b-0 px-4 md:px-8 py-3 text-xs md:text-sm font-medium transition-all ${
-                activeTab === tab.key
-                  ? "bg-[#D8DFEA] text-black"
-                  : "bg-[#ECECEC] text-gray-600"
-              }`}
+              type="button"
+              className="min-w-fit whitespace-nowrap rounded-t-[24px] border border-b-0 bg-[#D8DFEA] px-4 py-3 text-xs font-medium text-black md:px-8 md:text-sm"
             >
-              {tab.key}
+              {getWorkOrderActivityLabel(
+                data.activityTypeCode,
+                data.activityName,
+              )}
             </button>
-          ))}
+          )}
         </div>
 
         {/* Tab Content */}
@@ -588,6 +463,12 @@ export default function FormEditWoScreen() {
             <InfoField label="Bill of Landing" value={`${data.blNumber}`} />
           </div>
         </div>
+
+        {!definition && (
+          <p className="mt-4 text-sm font-medium text-red-600">
+            Unsupported work order activity: {data.activityTypeCode}
+          </p>
+        )}
 
         {isTransportActivity && (
           <div className="my-7">
@@ -630,7 +511,7 @@ export default function FormEditWoScreen() {
           </div>
         )}
 
-        {activeTab && currentConfig && (
+        {definition && currentConfig && (
           <div className="bg-[#d9dde3] rounded-[6px] p-3">
             {/* ================= TABLE LAYOUT ================= */}
             {currentConfig.layout === "table" && (
@@ -1074,11 +955,11 @@ export default function FormEditWoScreen() {
 
       <div className="mt-5 flex flex-col-reverse md:flex-row justify-end gap-3 md:gap-4">
         {/* Draft */}
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={handleDraft}
-          disabled={isDrafting}
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleDraft}
+            disabled={isDrafting || !definition}
           type="button"
           className="w-full md:w-auto md:min-w-28.5"
         >
@@ -1086,11 +967,11 @@ export default function FormEditWoScreen() {
         </Button>
 
         {/* Submit */}
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={handleSubmitFromDraft}
-          disabled={isSubmitting || isUploading}
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleSubmitFromDraft}
+            disabled={isSubmitting || isUploading || !definition}
           className="w-full md:w-auto"
         >
           {isSubmitting

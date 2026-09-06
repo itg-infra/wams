@@ -1,9 +1,50 @@
 // workOrderMapper.ts
 import { createEmptyRow, type WorkOrderRow } from "../config/workOrderRowConfig";
-import type { LoadingItem, UnloadingItem, WorkOrderDetail } from "./detailWo.type";
+import { getWorkOrderActivityDefinition } from "../config/workOrderActivityDefinitions";
+import type {
+  LoadingItem,
+  StorageHandlingDetail,
+  UnloadingItem,
+  WorkOrderDetail,
+} from "./detailWo.type";
 
 let rowIdCounter = 0;
 const nextId = () => ++rowIdCounter;
+
+export function mapStorageHandlingDetail(
+  detail: StorageHandlingDetail | null,
+): WorkOrderRow[] {
+  const storage = detail ?? {
+    hasPindahStapel: false,
+    hasPembersihan: false,
+    hasPerapihan: false,
+    volumeWeight: 0,
+    workerOnDuty: 0,
+    hasMask: false,
+    hasSafetyGlasses: false,
+    hasHandGloves: false,
+    hasHelmet: false,
+    hasSafetyShoes: false,
+    hasSafetyVest: false,
+  };
+
+  return [
+    {
+      ...createEmptyRow(nextId()),
+      hasPindahStapel: storage.hasPindahStapel ?? false,
+      hasPembersihan: storage.hasPembersihan ?? false,
+      hasPerapihan: storage.hasPerapihan ?? false,
+      volumeWeight: storage.volumeWeight ?? 0,
+      workerOnDuty: storage.workerOnDuty ?? 0,
+      hasMask: storage.hasMask ?? false,
+      hasSafetyGlasses: storage.hasSafetyGlasses ?? false,
+      hasHandGloves: storage.hasHandGloves ?? false,
+      hasHelmet: storage.hasHelmet ?? false,
+      hasSafetyShoes: storage.hasSafetyShoes ?? false,
+      hasSafetyVest: storage.hasSafetyVest ?? false,
+    },
+  ];
+}
 
 // const baseFromDetail = (detail: WorkOrderDetail): Partial<WorkOrderRow> => ({
 //   // field-field global yang mau selalu ikut ke setiap row, kalau ada
@@ -57,8 +98,6 @@ export function mapWorkOrderDetailToRows(
 ): WorkOrderRow[] {
   const code = detail.activityTypeCode;
 
-  console.log(`Code activity: ${code}`)
-
   switch (code) {
     case "K.BONGKAR": {
       const items = detail.unloadingItems ?? [];
@@ -105,48 +144,17 @@ export function mapWorkOrderDetailToRows(
       ];
     }
 
-    // case "K.GUDANG":
+    case "K.GUDANG":
+    case "OPNAME":
     case "OTHERS": {
-      const s = detail.storage;
-
-      // Jika data 'others' dari backend kosong (belum diisi),
-      // berikan nilai default (false / 0) agar form TETEAP MUNCUL.
-      if (!s) {
-        return [
-          {
-            ...createEmptyRow(nextId()),
-            hasPindahStapel: false,
-            hasPembersihan: false,
-            hasPerapihan: false,
-            volumeWeight: 0,
-            workerOnDuty: 0,
-            hasMask: false,
-            hasSafetyGlasses: false,
-            hasHandGloves: false,
-            hasHelmet: false,
-            hasSafetyShoes: false,
-            hasSafetyVest: false,
-          },
-        ];
-      }
-
-      // Jika data 'others' sudah ada dari backend (saat mode Edit)
-      return [
-        {
-          ...createEmptyRow(nextId()),
-          hasPindahStapel: s.hasPindahStapel ?? false,
-          hasPembersihan: s.hasPembersihan ?? false,
-          hasPerapihan: s.hasPerapihan ?? false,
-          volumeWeight: s.volumeWeight ?? 0,
-          workerOnDuty: s.workerOnDuty ?? 0,
-          hasMask: s.hasMask ?? false,
-          hasSafetyGlasses: s.hasSafetyGlasses ?? false,
-          hasHandGloves: s.hasHandGloves ?? false,
-          hasHelmet: s.hasHelmet ?? false,
-          hasSafetyShoes: s.hasSafetyShoes ?? false,
-          hasSafetyVest: s.hasSafetyVest ?? false,
-        },
-      ];
+      const definition = getWorkOrderActivityDefinition(code);
+      const activityDetail = definition
+        ? (detail as unknown as Record<string, unknown>)[definition.detailKey] as
+            | StorageHandlingDetail
+            | null
+            | undefined
+        : null;
+      return mapStorageHandlingDetail(activityDetail ?? null);
     }
 
     case "UNBAGGING": {

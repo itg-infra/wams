@@ -2739,6 +2739,7 @@ List endpoints (`/approved-plans` and `GET /`) are scoped by the [`X-Warehouse-I
 | GET | `/api/v1/work-orders/approved-plans` | `workorder.workorder.read` | List `Approved` budget plans. Each activity entry includes the pre-created WO `id` and `code`. Scoped by [`X-Warehouse-Id`](#warehouse-scoping-header) header. | Query: `page`, `limit` | `PaginatedResponse<ApprovedBpForWoResponse>` |
 | GET | `/api/v1/work-orders` | `workorder.workorder.read` | List work orders (paginated). Scoped by [`X-Warehouse-Id`](#warehouse-scoping-header) header. |
 | GET | `/api/v1/work-orders/{id}` | `workorder.workorder.read` | Get work order detail by ID |
+| GET | `/api/v1/work-orders/{id}/pic` | `workorder.workorder.update` | List users eligible to be assigned as PIC for the work order |
 | PUT | `/api/v1/work-orders/{id}` | `workorder.workorder.update` | Fill in / update a draft work order |
 | DELETE | `/api/v1/work-orders/{id}` | `workorder.workorder.delete` | Soft-delete a draft work order |
 | POST | `/api/v1/work-orders/{id}/submit` | `workorder.workorder.submit` | Submit a draft work order |
@@ -2764,10 +2765,15 @@ Only `Draft` work orders can be updated, deleted, or submitted.
   - `K.MUAT` → `loadingItems`
   - `FUMIGASI` → `fumigation`
   - `K.GUDANG` → `storage`
+  - `OPNAME` → `opname`
   - `QC` → `qc`
   - `ALAT_BERAT` → `heavyEquipment`
   - `UNBAGGING` → `unbagging`
   - `REBAGGING` → `rebagging`
+  - `OTHERS` → `others`
+- `K.GUDANG`, `OPNAME`, and `OTHERS` use the same storage/handling detail shape and database detail record. The response populates only the property matching the work order's `activityTypeCode`.
+- An update may provide zero or one activity-specific detail property. If one is provided, it must match the work order's activity type; providing multiple detail properties or using the wrong property returns `422 VALIDATION_ERROR`.
+- `startDate` and `endDate` are nullable on Draft work orders. On update, omit them or send `null` to leave the current value unchanged; send an ISO-8601 datetime to set a value. An empty string is not a valid nullable datetime and returns `400 Bad Request` during model binding.
 - **GPS location** (`gpsLocation`) is optional on create and update, but **required before submit** - `POST .../submit` returns `422` if `gpsLocation` is null. The GPS check runs before any DB write, so a missing-GPS rejection leaves the WO in `Draft` with no side-effects.
 - **`picUserId`** must reference an existing active user; a non-existent ID returns `422`.
 - **`blNumber`** is required (non-empty) on every entry in `unloadingItems` and `loadingItems`; an empty or missing value returns `422`.
@@ -2920,6 +2926,8 @@ DELETE /api/v1/files/work-orders/{id}/{fileId}     - delete attachment
   "loadingItems": null,
   "fumigation": null,
   "storage": null,
+  "opname": null,
+  "others": null,
   "qc": null,
   "heavyEquipment": null,
   "unbagging": null,
@@ -2937,6 +2945,7 @@ DELETE /api/v1/files/work-orders/{id}/{fileId}     - delete attachment
 - `gpsLocation` - `null` when not yet set; present once the foreman supplies coordinates. Must be non-null before `POST .../submit` succeeds. Use `PUT /work-orders/{id}` with `gpsLocation` to set/update it on a Draft WO.
 - `vesselName` - `SpkShadow.CardName` (the cargo owner / client name from SAP SPK)
 - `transportOrders` - `null` for all activity types except `K.BONGKAR` and `K.MUAT`; when present, each entry represents a selected Transport Order (one chip = one distinct DocNo). Use `shadowId`s to reconstruct which shadow rows belong to each chip.
+- Activity detail response properties are mutually exclusive: `K.GUDANG` populates `storage`, `OPNAME` populates `opname`, and `OTHERS` populates `others`. The other activity detail properties are `null`.
 
 #### `TransportOrderRef`
 ```json
@@ -3010,16 +3019,19 @@ Work Orders are **auto-created by the server** when the Budget Plan reaches fina
   "loadingItems": null,
   "fumigation": null,
   "storage": null,
+  "opname": null,
   "qc": null,
   "heavyEquipment": null,
   "unbagging": null,
-  "rebagging": null
+  "rebagging": null,
+  "others": null
 }
 ```
 
 - All fields optional. Providing `transportOrderShadowIds` fully replaces the existing transport order links.
 - Providing `gpsLocation` replaces the current GPS coordinate. Omit the field to leave it unchanged.
-- On update, each detail collection/object is replaced only if that field is provided in the payload.
+- On update, each detail collection/object is replaced only if that field is provided in the payload. Provide at most one activity-specific detail property, and use the property matching the WO's `activityTypeCode`; otherwise the API returns `422 VALIDATION_ERROR`.
+- `startDate` and `endDate` accept ISO-8601 datetimes or `null`. Omit or send `null` to leave an existing date unchanged. For a newly-created Draft with no dates, `null` is the expected response/request value; do not send `""`.
 - `unloadingItems` and `loadingItems` are ordered by `sortOrder`.
 
 ---
@@ -3138,9 +3150,9 @@ Used for **Fumigasi** work orders. Single object, not an array.
 
 ---
 
-#### StorageDetail - `K.GUDANG` (`storage: {}`)
+#### StorageHandlingDetail - `K.GUDANG`, `OPNAME`, and `OTHERS` (`storage: {}`, `opname: {}`, or `others: {}`)
 
-Used for **Kegiatan Gudang** work orders. Single object.
+Used for **Kegiatan Gudang**, **Opname**, and **Others** work orders. The object shape is identical for all three activity types; send it under the property corresponding to the work order's `activityTypeCode`. It is a single object, not an array.
 
 ```json
 {
@@ -3171,6 +3183,24 @@ Used for **Kegiatan Gudang** work orders. Single object.
 | `hasHelmet` | bool | **Yes** | PPE: helmet worn |
 | `hasSafetyShoes` | bool | **Yes** | PPE: safety shoes worn |
 | `hasSafetyVest` | bool | **Yes** | PPE: safety vest worn |
+
+Examples of the activity-specific property names:
+
+```json
+{
+  "activityTypeCode": "OPNAME",
+  "opname": { "hasPindahStapel": false, "hasPembersihan": true, "hasPerapihan": false, "volumeWeight": 100.0, "workerOnDuty": 2, "hasMask": true, "hasSafetyGlasses": true, "hasHandGloves": true, "hasHelmet": true, "hasSafetyShoes": true, "hasSafetyVest": true }
+}
+```
+
+```json
+{
+  "activityTypeCode": "OTHERS",
+  "others": { "hasPindahStapel": false, "hasPembersihan": false, "hasPerapihan": true, "volumeWeight": 50.0, "workerOnDuty": 1, "hasMask": true, "hasSafetyGlasses": false, "hasHandGloves": true, "hasHelmet": true, "hasSafetyShoes": true, "hasSafetyVest": false }
+}
+```
+
+Do not send `storage`, `opname`, and `others` together. The update endpoint accepts only the one property matching the persisted activity type.
 
 ---
 

@@ -99,6 +99,10 @@ public static class ErrorMessages
         public const string RequiresLoadingItem = ActivityTypeCodes.Muat + " work orders require at least one loading item before submission";
         public static string RequiresStorageHandlingDetail(string code) =>
             $"{code} work orders require storage/handling detail before submission";
+        public const string MultipleActivityDetails =
+            "Work order updates accept one activity detail property.";
+        public static string ActivityDetailPropertyMismatch(string activityTypeCode, string expectedProperty) =>
+            $"{activityTypeCode} work orders accept detail in '{expectedProperty}' only.";
         public const string UnloadingBlNumberRequired = "UnloadingItem BlNumber is required and cannot be empty";
         public const string LoadingBlNumberRequired = "LoadingItem BlNumber is required and cannot be empty";
     }

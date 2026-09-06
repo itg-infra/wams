@@ -24,6 +24,7 @@ using WAMS.Domain.Enums;
 using WAMS.Domain.Exceptions;
 using WAMS.Domain.ValueObjects;
 using Xunit;
+using DomainValidationException = WAMS.Domain.Exceptions.ValidationException;
 
 public class WorkOrderServiceTests
 {
@@ -427,37 +428,53 @@ public class WorkOrderServiceTests
         wo.PicUserId.Should().Be(1);
     }
 
-    [Fact]
-    public async Task UpdateAsync_OthersSentInsteadOfStorage_PopulatesStorageDetail()
+    [Theory]
+    [InlineData(ActivityTypeCodes.Gudang)]
+    [InlineData(ActivityTypeCodes.Opname)]
+    [InlineData(ActivityTypeCodes.Others)]
+    public async Task UpdateAsync_SharedFormActivity_UsesMatchingNamedProperty(string activityTypeCode)
     {
-        var wo = new WorkOrder { Id = 10, Status = WorkOrderStatus.Draft, BudgetPlanId = 1, CompanyId = 7, WarehouseShadowId = 3 };
-        _woRepo.GetByIdForUpdateAsync(10, TestContext.Current.CancellationToken).Returns(wo);
-        _recapRepo.IsApprovedByBudgetPlanIdAsync(1, TestContext.Current.CancellationToken).Returns(false);
-        _userRepo.CheckWarehouseAccessAsync(42, 3, TestContext.Current.CancellationToken).Returns((true, true));
-        _woRepo.GetByIdProjectionAsync(10, TestContext.Current.CancellationToken).Returns(MakeWorkOrderResponse());
+        var wo = DraftWorkOrder(activityTypeCode);
+        ArrangeEditableWorkOrder(wo);
 
-        var req = MakeMinimalUpdateRequest(picUserId: null) with
-        {
-            Others = new CreateStorageDetailRequest(
-                HasPindahStapel: true,
-                HasPembersihan: true,
-                HasPerapihan: true,
-                VolumeWeight: 2121,
-                WorkerOnDuty: 221,
-                HasMask: true,
-                HasSafetyGlasses: true,
-                HasHandGloves: true,
-                HasHelmet: true,
-                HasSafetyShoes: true,
-                HasSafetyVest: true)
-        };
+        var detail = StorageRequest(volumeWeight: 2121m, workerOnDuty: 221);
+        var req = RequestWithDetail(activityTypeCode, detail);
 
-        await _sut.UpdateAsync(10, req, userId: 42, ct: TestContext.Current.CancellationToken);
+        await _sut.UpdateAsync(wo.Id, req, userId: 42, ct: TestContext.Current.CancellationToken);
 
         wo.StorageDetail.Should().NotBeNull();
-        wo.StorageDetail!.VolumeWeight.Should().Be(2121);
-        wo.StorageDetail!.WorkerOnDuty.Should().Be(221);
-        wo.StorageDetail!.HasMask.Should().BeTrue();
+        wo.StorageDetail!.VolumeWeight.Should().Be(2121m);
+        wo.StorageDetail.WorkerOnDuty.Should().Be(221);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_OpnameWithStorageProperty_ThrowsValidation()
+    {
+        var wo = DraftWorkOrder(ActivityTypeCodes.Opname);
+        ArrangeEditableWorkOrder(wo);
+        var req = MakeMinimalUpdateRequest(null) with { Storage = StorageRequest() };
+
+        var act = () => _sut.UpdateAsync(wo.Id, req, 42, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<DomainValidationException>()
+            .WithMessage("OPNAME work orders accept detail in 'opname' only.");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithMultipleActivityDetails_ThrowsValidation()
+    {
+        var wo = DraftWorkOrder(ActivityTypeCodes.Gudang);
+        ArrangeEditableWorkOrder(wo);
+        var req = MakeMinimalUpdateRequest(null) with
+        {
+            Storage = StorageRequest(),
+            Others = StorageRequest(),
+        };
+
+        var act = () => _sut.UpdateAsync(wo.Id, req, 42, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<DomainValidationException>()
+            .WithMessage("Work order updates accept one activity detail property.");
     }
 
     // --- GetPicCandidatesAsync ---
@@ -518,7 +535,53 @@ public class WorkOrderServiceTests
         Qc: null,
         HeavyEquipment: null,
         Unbagging: null,
-        Rebagging: null);
+        Rebagging: null,
+        Opname: null,
+        Others: null);
+
+    private static WorkOrder DraftWorkOrder(string activityTypeCode) => new()
+    {
+        Id = 10,
+        Status = WorkOrderStatus.Draft,
+        BudgetPlanId = 1,
+        CompanyId = 7,
+        WarehouseShadowId = 3,
+        ActivityTypeCode = activityTypeCode,
+    };
+
+    private void ArrangeEditableWorkOrder(WorkOrder wo)
+    {
+        _woRepo.GetByIdForUpdateAsync(wo.Id, TestContext.Current.CancellationToken).Returns(wo);
+        _recapRepo.IsApprovedByBudgetPlanIdAsync(wo.BudgetPlanId, TestContext.Current.CancellationToken).Returns(false);
+        _userRepo.CheckWarehouseAccessAsync(42, wo.WarehouseShadowId, TestContext.Current.CancellationToken)
+            .Returns((true, true));
+        _woRepo.GetByIdProjectionAsync(wo.Id, TestContext.Current.CancellationToken).Returns(MakeWorkOrderResponse());
+    }
+
+    private static UpdateWorkOrderRequest RequestWithDetail(
+        string activityTypeCode,
+        CreateStorageDetailRequest detail) => activityTypeCode switch
+    {
+        ActivityTypeCodes.Gudang => MakeMinimalUpdateRequest(null) with { Storage = detail },
+        ActivityTypeCodes.Opname => MakeMinimalUpdateRequest(null) with { Opname = detail },
+        ActivityTypeCodes.Others => MakeMinimalUpdateRequest(null) with { Others = detail },
+        _ => throw new ArgumentOutOfRangeException(nameof(activityTypeCode), activityTypeCode, null),
+    };
+
+    private static CreateStorageDetailRequest StorageRequest(
+        decimal volumeWeight = 0,
+        int workerOnDuty = 0) => new(
+            HasPindahStapel: true,
+            HasPembersihan: true,
+            HasPerapihan: true,
+            VolumeWeight: volumeWeight,
+            WorkerOnDuty: workerOnDuty,
+            HasMask: true,
+            HasSafetyGlasses: true,
+            HasHandGloves: true,
+            HasHelmet: true,
+            HasSafetyShoes: true,
+            HasSafetyVest: true);
 
     private static BpForWoCreateProjection MakeBpProjection() => new(
         Id: 1,
@@ -561,6 +624,8 @@ public class WorkOrderServiceTests
         LoadingItems: null,
         Fumigation: null,
         Storage: null,
+        Opname: null,
+        Others: null,
         Qc: null,
         HeavyEquipment: null,
         Unbagging: null,

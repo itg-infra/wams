@@ -18430,6 +18430,12 @@
           "storage": {
             "$ref": "#/components/schemas/CreateStorageDetailRequest"
           },
+          "opname": {
+            "$ref": "#/components/schemas/CreateStorageDetailRequest"
+          },
+          "others": {
+            "$ref": "#/components/schemas/CreateStorageDetailRequest"
+          },
           "qc": {
             "$ref": "#/components/schemas/CreateQcDetailRequest"
           },
@@ -19336,6 +19342,12 @@
             "$ref": "#/components/schemas/WorkOrderFumigationDetailResponse"
           },
           "storage": {
+            "$ref": "#/components/schemas/WorkOrderStorageDetailResponse"
+          },
+          "opname": {
+            "$ref": "#/components/schemas/WorkOrderStorageDetailResponse"
+          },
+          "others": {
             "$ref": "#/components/schemas/WorkOrderStorageDetailResponse"
           },
           "qc": {

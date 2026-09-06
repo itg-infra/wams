@@ -473,6 +473,8 @@ export const ACTIVITY_CONFIG_EDIT: Record<string, ActivityConfig> = {
   },
 };
 
+export const STORAGE_HANDLING_CONFIG: ActivityConfig = ACTIVITY_CONFIG_EDIT.Storage;
+
 export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
   // ================= K.BONGKAR =================
 
@@ -711,68 +713,8 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
 
   // ================= K.GUDANG =================
 
-  "K.GUDANG": {
-    layout: "checklist",
-    columns: 3,
-
-    fields: [
-      {
-        label: "Pindah Stapel",
-        key: "hasPindahStapel",
-        type: "boolean",
-      },
-      {
-        label: "Pembersihan",
-        key: "hasPembersihan",
-        type: "boolean",
-      },
-      {
-        label: "Perapihan",
-        key: "hasPerapihan",
-        type: "boolean",
-      },
-      {
-        label: "Volume Weight",
-        key: "volumeWeight",
-        type: "number",
-      },
-      {
-        label: "Worker On Duty",
-        key: "workerOnDuty",
-        type: "number",
-      },
-      {
-        label: "Mask",
-        key: "hasMask",
-        type: "boolean",
-      },
-      {
-        label: "Safety Glasses",
-        key: "hasSafetyGlasses",
-        type: "boolean",
-      },
-      {
-        label: "Hand Gloves",
-        key: "hasHandGloves",
-        type: "boolean",
-      },
-      {
-        label: "Helmet",
-        key: "hasHelmet",
-        type: "boolean",
-      },
-      {
-        label: "Safety Shoes",
-        key: "hasSafetyShoes",
-        type: "boolean",
-      },
-      {
-        label: "Safety Vest",
-        key: "hasSafetyVest",
-        type: "boolean",
-      },
-    ],
-  },
+  "K.GUDANG": STORAGE_HANDLING_CONFIG,
+  OPNAME: STORAGE_HANDLING_CONFIG,
 
   // ================= Others =================
 
@@ -839,65 +781,7 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
   //   ],
   // },
 
-  OTHERS: {
-    layout: "others",
-    fields: [
-      {
-        label: "Pindah Stapel",
-        key: "hasPindahStapel",
-        type: "boolean",
-        variant: "radio",
-      },
-      {
-        label: "Pembersihan",
-        key: "hasPembersihan",
-        type: "boolean",
-        variant: "radio",
-      },
-      {
-        label: "Perapihan",
-        key: "hasPerapihan",
-        type: "boolean",
-        variant: "radio",
-      },
-
-      {
-        label: "Volume Weight",
-        key: "volumeWeight",
-        type: "number",
-        unit: "Kg",
-      },
-      { label: "Worker on Duty", key: "workerOnDuty", type: "number" },
-
-      // urutan row-major untuk grid 2 kolom kanan
-      { label: "Mask", key: "hasMask", type: "boolean", group: "tools" },
-      {
-        label: "Safety Glasses",
-        key: "hasSafetyGlasses",
-        type: "boolean",
-        group: "tools",
-      },
-      {
-        label: "Hand Gloves",
-        key: "hasHandGloves",
-        type: "boolean",
-        group: "tools",
-      },
-      { label: "Helmet", key: "hasHelmet", type: "boolean", group: "tools" },
-      {
-        label: "Safety Shoes",
-        key: "hasSafetyShoes",
-        type: "boolean",
-        group: "tools",
-      },
-      {
-        label: "Safety Vest",
-        key: "hasSafetyVest",
-        type: "boolean",
-        group: "tools",
-      },
-    ],
-  },
+  OTHERS: STORAGE_HANDLING_CONFIG,
 
   // ================= UNBAGGING =================
 

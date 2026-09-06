@@ -94,6 +94,8 @@ public record WorkOrderResponse(
     List<WorkOrderLoadingItemResponse>? LoadingItems,
     WorkOrderFumigationDetailResponse? Fumigation,
     WorkOrderStorageDetailResponse? Storage,
+    WorkOrderStorageDetailResponse? Opname,
+    WorkOrderStorageDetailResponse? Others,
     WorkOrderQcDetailResponse? Qc,
     WorkOrderHeavyEquipDetailResponse? HeavyEquipment,
     WorkOrderUnbaggingDetailResponse? Unbagging,
@@ -329,7 +331,7 @@ public record UpdateWorkOrderRequest(
     CreateHeavyEquipDetailRequest? HeavyEquipment,
     CreateUnbaggingDetailRequest? Unbagging,
     CreateRebaggingDetailRequest? Rebagging,
-    // others for now mapped to storage detail
+    CreateStorageDetailRequest? Opname = null,
     CreateStorageDetailRequest? Others = null
 );
 

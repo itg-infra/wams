@@ -183,6 +183,7 @@ public class WorkOrderService(
         if (request.GpsLocation is not null) wo.GpsLocation = MapGps(request.GpsLocation);
 
         ValidateItemBlNumbers(request.UnloadingItems, request.LoadingItems);
+        ValidateActivityDetailRequest(wo, request);
 
         // Snapshot old child state before mutations
         var oldChildValues = BuildChildSnapshot(wo);
@@ -434,6 +435,48 @@ public class WorkOrderService(
             throw new DomainValidationException(ErrorMessages.WorkOrder.LoadingBlNumberRequired);
     }
 
+    private static void ValidateActivityDetailRequest(WorkOrder wo, UpdateWorkOrderRequest request)
+    {
+        var provided = new (string Name, object Value)[]
+        {
+            ("unloadingItems", request.UnloadingItems!),
+            ("loadingItems", request.LoadingItems!),
+            ("fumigation", request.Fumigation!),
+            ("storage", request.Storage!),
+            ("opname", request.Opname!),
+            ("qc", request.Qc!),
+            ("heavyEquipment", request.HeavyEquipment!),
+            ("unbagging", request.Unbagging!),
+            ("rebagging", request.Rebagging!),
+            ("others", request.Others!),
+        }.Where(detail => detail.Value is not null).ToList();
+
+        if (provided.Count > 1)
+            throw new DomainValidationException(ErrorMessages.WorkOrder.MultipleActivityDetails);
+
+        if (provided.Count == 1)
+        {
+            var expectedProperty = wo.ActivityTypeCode switch
+            {
+                ActivityTypeCodes.Bongkar => "unloadingItems",
+                ActivityTypeCodes.Muat => "loadingItems",
+                ActivityTypeCodes.Fumigasi => "fumigation",
+                ActivityTypeCodes.Gudang => "storage",
+                ActivityTypeCodes.Opname => "opname",
+                ActivityTypeCodes.Qc => "qc",
+                ActivityTypeCodes.AlatBerat => "heavyEquipment",
+                ActivityTypeCodes.Unbagging => "unbagging",
+                ActivityTypeCodes.Rebagging => "rebagging",
+                ActivityTypeCodes.Others => "others",
+                _ => null,
+            };
+
+            if (expectedProperty is not null && provided[0].Name != expectedProperty)
+                throw new DomainValidationException(
+                    ErrorMessages.WorkOrder.ActivityDetailPropertyMismatch(wo.ActivityTypeCode, expectedProperty));
+        }
+    }
+
     private static void ReplaceDetails(WorkOrder wo, UpdateWorkOrderRequest req)
     {
         if (req.UnloadingItems is not null)
@@ -458,7 +501,7 @@ public class WorkOrderService(
                 wo.FumigationDetail = MapFumigationDetail(req.Fumigation);
         }
 
-        var storage = req.Storage ?? req.Others;
+        var storage = GetStorageHandlingRequest(wo.ActivityTypeCode, req);
         if (storage is not null)
         {
             if (wo.StorageDetail is not null)
@@ -499,6 +542,16 @@ public class WorkOrderService(
                 wo.RebaggingDetail = MapRebaggingDetail(req.Rebagging);
         }
     }
+
+    private static CreateStorageDetailRequest? GetStorageHandlingRequest(
+        string activityTypeCode,
+        UpdateWorkOrderRequest request) => activityTypeCode switch
+        {
+            ActivityTypeCodes.Gudang => request.Storage,
+            ActivityTypeCodes.Opname => request.Opname,
+            ActivityTypeCodes.Others => request.Others,
+            _ => null,
+        };
 
     private static WorkOrderUnloadingItem MapUnloadingItem(CreateUnloadingItemRequest r) => new()
     {
