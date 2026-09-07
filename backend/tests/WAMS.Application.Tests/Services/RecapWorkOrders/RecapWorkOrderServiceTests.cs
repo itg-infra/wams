@@ -92,4 +92,37 @@ public class RecapWorkOrderServiceTests
         await _budgetPlanRepo.DidNotReceive().RejectViaRecapAsync(
             Arg.Any<long>(), Arg.Any<long>(), Arg.Any<DateTime>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task GetByIdAsync_HeaderMatchesRecapButUserIsNotAssigned_ThrowsForbidden()
+    {
+        _warehouseContext.IsSet.Returns(true);
+        _warehouseContext.WarehouseId.Returns(5);
+        _rbacService.HasGlobalAccessAsync(99, Arg.Any<CancellationToken>()).Returns(false);
+        _userRepo.GetUserWarehouseIdsAsync(99, Arg.Any<CancellationToken>()).Returns([7]);
+        _recapRepo.GetDetailProjectionAsync(1, null, Arg.Any<CancellationToken>())
+            .Returns(Projection(warehouseId: 5));
+
+        var act = () => _sut.GetByIdAsync(1, 99, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_SelectedWarehouseButUserIsNotAssigned_ThrowsForbidden()
+    {
+        _warehouseContext.IsSet.Returns(true);
+        _warehouseContext.WarehouseId.Returns(5);
+        _rbacService.HasGlobalAccessAsync(99, Arg.Any<CancellationToken>()).Returns(false);
+        _userRepo.GetUserWarehouseIdsAsync(99, Arg.Any<CancellationToken>()).Returns([7]);
+
+        var act = () => _sut.GetAllAsync(new(), 99, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<ForbiddenException>();
+    }
+
+    private static RecapDetailProjection Projection(long warehouseId) => new(
+        1, 10, 1, warehouseId, "Pending", null, null, null,
+        new RecapDetailHeader("BP-1", "TPL-1", "Approved", null, DateTime.UtcNow, "WH1", "Warehouse 1", null),
+        [], [], []);
 }

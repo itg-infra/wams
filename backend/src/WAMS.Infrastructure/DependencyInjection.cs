@@ -212,6 +212,7 @@ public static class DependencyInjection
         services.AddScoped<IFinanceReportRepository, FinanceReportRepository>();
         services.AddScoped<IRcaRepository, RcaRepository>();
         services.AddScoped<IRcaPdfRenderer, RcaPdfRenderer>();
+        services.AddScoped<IRecapWorkOrderPdfRenderer, RecapWorkOrderPdfRenderer>();
         services.AddScoped<IPurchaseOrderPdfRenderer, PurchaseOrderPdfRenderer>();
         services.AddScoped<IRfbaFormPdfRenderer, RfbaFormPdfRenderer>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();

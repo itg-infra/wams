@@ -146,25 +146,18 @@ public class RecapWorkOrderService(
         {
             if (warehouseShadowId != warehouseContext.WarehouseId.Value)
                 throw new ForbiddenException(ErrorMessages.RecapWorkOrder.AccessDeniedDifferentWarehouse);
-            return;
         }
 
-        if (!warehouseContext.IsSet)
-        {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
-            if (!hasGlobal)
-            {
-                var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
-                if (!ids.Contains(warehouseShadowId))
-                    throw new ForbiddenException(ErrorMessages.RecapWorkOrder.AccessDeniedDifferentWarehouse);
-            }
-        }
+        await EnsureUserCanAccessWarehouseAsync(warehouseShadowId, userId, ct);
     }
 
     private async Task<IReadOnlyList<long>?> ResolveWarehouseIdsAsync(long userId, CancellationToken ct)
     {
         if (warehouseContext.IsSet && warehouseContext.WarehouseId.HasValue)
+        {
+            await EnsureUserCanAccessWarehouseAsync(warehouseContext.WarehouseId.Value, userId, ct);
             return [warehouseContext.WarehouseId.Value];
+        }
 
         if (!warehouseContext.IsSet)
         {
@@ -174,6 +167,16 @@ public class RecapWorkOrderService(
         }
 
         return null;
+    }
+
+    private async Task EnsureUserCanAccessWarehouseAsync(long warehouseId, long userId, CancellationToken ct)
+    {
+        if (await rbacService.HasGlobalAccessAsync(userId, ct))
+            return;
+
+        var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        if (!ids.Contains(warehouseId))
+            throw new ForbiddenException(ErrorMessages.RecapWorkOrder.AccessDeniedDifferentWarehouse);
     }
 
     private static RecapWorkOrderDetailResponse MapProjection(RecapDetailProjection p)

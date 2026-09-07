@@ -2019,8 +2019,9 @@ Warehouses are **read-only** in the API - master data is sourced exclusively fro
 | Method | Endpoint | Permission |
 |--------|----------|------------|
 | `GET` | `/api/v1/recap-work-orders` | `workorder.recap.read` |
-| `GET` | `/api/v1/recap-work-orders/export?format=Xlsx\|Csv\|Pdf` | `workorder.recap.read` |
+| `GET` | `/api/v1/recap-work-orders/export?format=Xlsx\|Csv\|Pdf` | `workorder.recap.export` |
 | `GET` | `/api/v1/recap-work-orders/{id}` | `workorder.recap.read` |
+| `GET` | `/api/v1/recap-work-orders/{id}/export` | `workorder.recap.export` |
 | `POST` | `/api/v1/recap-work-orders/{id}/approve` | `workorder.recap.approve` |
 | `POST` | `/api/v1/recap-work-orders/{id}/reject` | `workorder.recap.reject` |
 

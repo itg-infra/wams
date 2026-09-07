@@ -3419,7 +3419,9 @@ List and detail endpoints are scoped by warehouse: scoped users (no `GlobalAcces
 | Method | Path | Permission | Description |
 |--------|------|------------|-------------|
 | GET | `/api/v1/recap-work-orders` | `workorder.recap.read` | List all recap work orders (paginated) |
+| GET | `/api/v1/recap-work-orders/export` | `workorder.recap.export` | Export the filtered recap list as XLSX, CSV, or PDF |
 | GET | `/api/v1/recap-work-orders/{id}` | `workorder.recap.read` | Get recap detail with Plan + Realization tabs |
+| GET | `/api/v1/recap-work-orders/{id}/export` | `workorder.recap.export` | Export one recap with its Plan, SPK/cost details, all Work Orders, totals, and review information as an RCA-style PDF |
 | POST | `/api/v1/recap-work-orders/{id}/approve` | `workorder.recap.approve` | Approve a Pending recap |
 | POST | `/api/v1/recap-work-orders/{id}/reject` | `workorder.recap.reject` | Reject a Pending recap |
 
@@ -3431,6 +3433,8 @@ Pending reject > Rejected  (WOs remain mutable)
 ```
 
 Only `Pending` recaps can be approved or rejected. Both operations return `400 Bad Request` if the recap is already reviewed.
+
+The individual export is always returned as an `application/pdf` attachment named `Recap-WO-{budgetNo}-{timestamp}.pdf`. It uses the same warehouse-access rules as recap detail and supports Pending, Approved, and Rejected recaps.
 
 > **WO lock side-effect:** Approving a recap immediately locks all Work Orders under the same Budget Plan. Mutations (`PUT /work-orders/{id}`, `DELETE /work-orders/{id}`, `POST /work-orders/{id}/submit`) on those WOs will return `409 Conflict` until the recap is rejected or replaced. The lock is derived from recap status - no schema change or explicit unlock call is needed.
 
@@ -5149,7 +5153,8 @@ PDF reports automatically include the company logo when one is uploaded (`PUT /a
 | Budget Plans | `GET /api/v1/budget-plans/export` | `budget.plan.read` |
 | Purchase Orders | `GET /api/v1/purchase-orders/export` | `budget.po.read` |
 | Account Payables | `GET /api/v1/account-payables/export` | `workorder.ap.read` |
-| Recap Work Orders | `GET /api/v1/recap-work-orders/export` | `workorder.recap.read` |
+| Recap Work Orders | `GET /api/v1/recap-work-orders/export` | `workorder.recap.export` |
+| Individual Recap Work Order PDF | `GET /api/v1/recap-work-orders/{id}/export` | `workorder.recap.export` |
 | Transport Orders | `GET /api/v1/transport-orders/export` | `workorder.workorder.read` |
 | SPK | `GET /api/v1/spk/export` | `budget.plan.read` |
 | Users | `GET /api/v1/users/export` | `user.user.read` |

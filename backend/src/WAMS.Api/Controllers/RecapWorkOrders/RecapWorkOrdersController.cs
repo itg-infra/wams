@@ -18,7 +18,13 @@ using WAMS.Application.Interfaces.RecapWorkOrders;
 [ApiController]
 [Route("api/v1/recap-work-orders")]
 [Authorize]
-public class RecapWorkOrdersController(IRecapWorkOrderService recapService, IExportService exportService, IOptions<ExportOptions> exportOptions, IAuditLogService auditLogService) : BaseController
+public class RecapWorkOrdersController(
+    IRecapWorkOrderService recapService,
+    IExportService exportService,
+    IOptions<ExportOptions> exportOptions,
+    IAuditLogService auditLogService,
+    IRecapWorkOrderPdfRenderer pdfRenderer,
+    IPdfMetadataResolver pdfMetadataResolver) : BaseController
 {
     private const string TableName = "recap_work_orders";
 
@@ -120,6 +126,22 @@ public class RecapWorkOrdersController(IRecapWorkOrderService recapService, IExp
         );
 
         return new EmptyResult();
+    }
+
+    /// <summary>Exports one work order recap, including all of its work orders, as a PDF.</summary>
+    [HttpGet("{id:long}/export")]
+    [RequirePermission(Permissions.WorkOrder.RecapExport)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportById(long id, CancellationToken ct)
+    {
+        var recap = await recapService.GetByIdAsync(id, GetUserId(), ct);
+        var metadata = await pdfMetadataResolver.ResolveAsync("Recap Work Order", ct);
+        var bytes = pdfRenderer.Render(recap, metadata);
+        var fileName = $"Recap-WO-{recap.Plan.Header.BudgetNo}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.pdf";
+
+        return File(bytes, "application/pdf", fileName);
     }
 
     /// <summary>Gets the paginated audit history for a work order recap.</summary>

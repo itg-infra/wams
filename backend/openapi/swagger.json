@@ -11,6 +11,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Gets paginated approved work order recaps eligible for account payable creation.",
         "parameters": [
           {
             "name": "Search",
@@ -83,6 +84,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Gets a paginated list of account payables.",
         "parameters": [
           {
             "name": "DateFrom",
@@ -184,6 +186,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Creates a new account payable as a draft.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -272,6 +275,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Gets a single account payable by id.",
         "parameters": [
           {
             "name": "id",
@@ -330,6 +334,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Updates an existing draft account payable.",
         "parameters": [
           {
             "name": "id",
@@ -427,6 +432,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Deletes a draft account payable.",
         "parameters": [
           {
             "name": "id",
@@ -490,10 +496,13 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Gets items available for account payable creation for a vendor within given budget plans.",
+        "description": "Response rows carry two independent signals, do not conflate them:\n`isGenerated` is true only when the item sits on an AP with `Status == Generated`;\nit says nothing about Draft APs holding the item.\n`takenByCode` is the Code of whichever AP (Draft or Generated) currently holds the item,\nor null if it is genuinely free. `takenByCode == null` is the selectability signal an\nitem can be picked; `isGenerated == false` alone does NOT mean an item is free, it may\nstill be sitting on someone else's Draft AP (non-null `takenByCode`).\nWhen `includeGenerated=false`, every returned row already has `takenByCode == null`\nby construction (taken items are filtered out before the response is built).\nPO and AP hold items in independent pools: an item on a Draft PO is still selectable here.",
         "parameters": [
           {
             "name": "vendorShadowId",
             "in": "query",
+            "description": "The vendor to find available budget plan items for.",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -502,6 +511,7 @@
           {
             "name": "budgetPlanIds",
             "in": "query",
+            "description": "Comma-separated list of budget plan ids to search within.",
             "schema": {
               "type": "string"
             }
@@ -509,6 +519,7 @@
           {
             "name": "includeGenerated",
             "in": "query",
+            "description": "When true, also includes items already taken by another AP (Draft or Generated), each flagged via isGenerated/takenByCode.",
             "schema": {
               "type": "boolean",
               "default": false
@@ -539,11 +550,128 @@
         }
       }
     },
+    "/api/v1/account-payables/{accountPayableId}/available-items": {
+      "get": {
+        "tags": [
+          "AccountPayables"
+        ],
+        "summary": "Gets available items while editing the specified draft account payable.",
+        "parameters": [
+          {
+            "name": "accountPayableId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "vendorShadowId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "budgetPlanIds",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeGenerated",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/account-payables/preview": {
+      "post": {
+        "tags": [
+          "AccountPayables"
+        ],
+        "summary": "Previews computed totals for an account payable before creating it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewAccountPayableRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewAccountPayableRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewAccountPayableRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPayableTotalsResponseApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPayableTotalsResponseApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPayableTotalsResponseApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/account-payables/generate": {
       "post": {
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Creates a new account payable and immediately generates it in SAP.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -632,6 +760,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Generates an existing draft account payable in SAP.",
         "parameters": [
           {
             "name": "id",
@@ -712,6 +841,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Exports account payables matching the query as a file stream.",
         "parameters": [
           {
             "name": "DateFrom",
@@ -805,6 +935,7 @@
         "tags": [
           "AccountPayables"
         ],
+        "summary": "Gets the audit history of an account payable.",
         "parameters": [
           {
             "name": "id",
@@ -886,6 +1017,7 @@
         "tags": [
           "ActivityTypes"
         ],
+        "summary": "Gets all activity types.",
         "responses": {
           "200": {
             "description": "OK",
@@ -913,6 +1045,7 @@
         "tags": [
           "ActivityTypes"
         ],
+        "summary": "Creates a new activity type.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -981,6 +1114,7 @@
         "tags": [
           "ActivityTypes"
         ],
+        "summary": "Gets a single activity type by id.",
         "parameters": [
           {
             "name": "id",
@@ -1039,6 +1173,7 @@
         "tags": [
           "ActivityTypes"
         ],
+        "summary": "Updates an existing activity type.",
         "parameters": [
           {
             "name": "id",
@@ -1116,6 +1251,7 @@
         "tags": [
           "ActivityTypes"
         ],
+        "summary": "Deletes an activity type.",
         "parameters": [
           {
             "name": "id",
@@ -1159,6 +1295,7 @@
         "tags": [
           "AuditLogs"
         ],
+        "summary": "Gets a paginated list of audit logs.",
         "parameters": [
           {
             "name": "TableName",
@@ -1285,6 +1422,7 @@
         "tags": [
           "AuditLogs"
         ],
+        "summary": "Gets an audit log by id.",
         "parameters": [
           {
             "name": "id",
@@ -1345,6 +1483,7 @@
         "tags": [
           "AuditLogs"
         ],
+        "summary": "Exports audit logs to a file in the requested format.",
         "parameters": [
           {
             "name": "TableName",
@@ -1461,6 +1600,7 @@
         "tags": [
           "AuditLogs"
         ],
+        "summary": "Gets the paginated change history for a specific record.",
         "parameters": [
           {
             "name": "tableName",
@@ -1550,6 +1690,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Authenticate user and receive access + refresh tokens",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1658,6 +1799,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Refresh access token using refresh token",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1746,6 +1888,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Logout and invalidate tokens",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1814,6 +1957,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Get current authenticated user info",
         "responses": {
           "200": {
             "description": "OK",
@@ -1863,6 +2007,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Change own password (requires current password)",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1951,6 +2096,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Gets a paginated list of budget plans.",
         "parameters": [
           {
             "name": "status",
@@ -2044,6 +2190,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Creates a new budget plan as a draft.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2132,11 +2279,20 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Gets a budget plan by id.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "vendorShadowId",
+            "in": "query",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -2190,6 +2346,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Updates a budget plan by id.",
         "parameters": [
           {
             "name": "id",
@@ -2287,6 +2444,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Deletes a budget plan by id.",
         "parameters": [
           {
             "name": "id",
@@ -2350,6 +2508,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Creates a new budget plan and immediately submits it for approval.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2438,6 +2597,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Submits a draft budget plan for approval.",
         "parameters": [
           {
             "name": "id",
@@ -2501,6 +2661,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Approves a submitted budget plan.",
         "parameters": [
           {
             "name": "id",
@@ -2564,6 +2725,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Rejects a submitted budget plan.",
         "parameters": [
           {
             "name": "id",
@@ -2646,6 +2808,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Adds an SPK item to a budget plan.",
         "parameters": [
           {
             "name": "id",
@@ -2745,6 +2908,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Removes an SPK item from a budget plan.",
         "parameters": [
           {
             "name": "id",
@@ -2797,6 +2961,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Exports budget plans to a file in the requested format.",
         "parameters": [
           {
             "name": "DateFrom",
@@ -2882,6 +3047,7 @@
         "tags": [
           "BudgetPlans"
         ],
+        "summary": "Gets the paginated change history for a budget plan.",
         "parameters": [
           {
             "name": "id",
@@ -2958,119 +3124,13 @@
         }
       }
     },
-    "/api/v1/budget-revisions": {
-      "post": {
-        "tags": [
-          "BudgetRevisions"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitBudgetRevisionRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitBudgetRevisionRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitBudgetRevisionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Content",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/budget-revisions/{id}": {
+    "/api/v1/budget-plans/{id}/rfba-pdf": {
       "get": {
         "tags": [
-          "BudgetRevisions"
+          "BudgetPlans"
         ],
+        "summary": "Exports a budget plan's RFBA items as printable Batch Advance forms.",
+        "description": "One A4 page per Bill of Lading, matching the client's reference form. Non-RFBA\nitems never appear. Plans that are not yet approved print with a DRAFT watermark,\nwhich is what pre-approval review needs.",
         "parameters": [
           {
             "name": "id",
@@ -3088,17 +3148,20 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
+                  "type": "string",
+                  "format": "binary"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
+                  "type": "string",
+                  "format": "binary"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -3119,306 +3182,6 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/budget-revisions/by-recap/{recapId}": {
-      "get": {
-        "tags": [
-          "BudgetRevisions"
-        ],
-        "parameters": [
-          {
-            "name": "recapId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseListApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseListApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseListApiResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/budget-revisions/{id}/approve": {
-      "post": {
-        "tags": [
-          "BudgetRevisions"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/budget-revisions/{id}/reject": {
-      "post": {
-        "tags": [
-          "BudgetRevisions"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectBudgetRevisionRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectBudgetRevisionRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectBudgetRevisionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BudgetRevisionResponseApiResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/budget-revisions/{id}/history": {
-      "get": {
-        "tags": [
-          "BudgetRevisions"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "Search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "SortBy",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "SortOrder",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Page",
-            "in": "query",
-            "schema": {
-              "maximum": 2147483647,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "Limit",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordHistoryResponsePaginatedResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordHistoryResponsePaginatedResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordHistoryResponsePaginatedResponse"
                 }
               }
             }
@@ -3431,6 +3194,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Exports budget templates to a file in the requested format.",
         "parameters": [
           {
             "name": "status",
@@ -3516,6 +3280,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Gets a paginated list of budget templates.",
         "parameters": [
           {
             "name": "status",
@@ -3609,6 +3374,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Creates a new budget template as a draft.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3697,6 +3463,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Gets a budget template by id.",
         "parameters": [
           {
             "name": "id",
@@ -3755,6 +3522,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Updates a budget template by id.",
         "parameters": [
           {
             "name": "id",
@@ -3852,6 +3620,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Deletes a budget template by id.",
         "parameters": [
           {
             "name": "id",
@@ -3915,6 +3684,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Creates a new budget template and immediately submits it for approval.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4003,6 +3773,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Submits a draft budget template for approval.",
         "parameters": [
           {
             "name": "id",
@@ -4066,6 +3837,7 @@
         "tags": [
           "BudgetTemplates"
         ],
+        "summary": "Gets the paginated change history for a budget template.",
         "parameters": [
           {
             "name": "id",
@@ -4147,6 +3919,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Exports companies to a file in the requested format.",
         "parameters": [
           {
             "name": "Search",
@@ -4209,6 +3982,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Public - no auth required. For the login page company dropdown.",
         "parameters": [
           {
             "name": "code",
@@ -4230,6 +4004,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Admin - returns all companies with full details.",
         "parameters": [
           {
             "name": "Search",
@@ -4300,6 +4075,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Creates a new company.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4331,6 +4107,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Gets a company by id.",
         "parameters": [
           {
             "name": "id",
@@ -4352,6 +4129,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Updates a company by id.",
         "parameters": [
           {
             "name": "id",
@@ -4392,6 +4170,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Soft-deactivate a company. Does not delete data.",
         "parameters": [
           {
             "name": "id",
@@ -4415,6 +4194,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Move a user to a different company. Clears their warehouse assignments.",
         "parameters": [
           {
             "name": "companyId",
@@ -4447,6 +4227,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Gets a company's logo image by id.",
         "parameters": [
           {
             "name": "id",
@@ -4488,6 +4269,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Uploads or replaces a company's logo image.",
         "parameters": [
           {
             "name": "id",
@@ -4589,6 +4371,7 @@
         "tags": [
           "Companies"
         ],
+        "summary": "Removes a company's logo image.",
         "parameters": [
           {
             "name": "id",
@@ -4652,6 +4435,7 @@
         "tags": [
           "Dashboard"
         ],
+        "summary": "Gets the dashboard summary for the current user.",
         "responses": {
           "200": {
             "description": "OK",
@@ -4681,6 +4465,7 @@
         "tags": [
           "Dashboard"
         ],
+        "summary": "Gets a paginated list of today's activities for the current user.",
         "parameters": [
           {
             "name": "Search",
@@ -4753,6 +4538,7 @@
         "tags": [
           "Dashboard"
         ],
+        "summary": "Gets dashboard history for a given year and month.",
         "parameters": [
           {
             "name": "year",
@@ -4800,6 +4586,7 @@
         "tags": [
           "Files"
         ],
+        "summary": "Uploads one or more files attached to an entity.",
         "parameters": [
           {
             "name": "entityType",
@@ -4909,6 +4696,7 @@
         "tags": [
           "Files"
         ],
+        "summary": "Lists all files attached to an entity.",
         "parameters": [
           {
             "name": "entityType",
@@ -4977,6 +4765,7 @@
         "tags": [
           "Files"
         ],
+        "summary": "Downloads a file attached to an entity, with range support.",
         "parameters": [
           {
             "name": "entityType",
@@ -5058,6 +4847,7 @@
         "tags": [
           "Files"
         ],
+        "summary": "Deletes a file attached to an entity.",
         "parameters": [
           {
             "name": "entityType",
@@ -5138,37 +4928,8 @@
         "tags": [
           "FinanceReports"
         ],
+        "summary": "Gets a paginated list of finance reports.",
         "parameters": [
-          {
-            "name": "ActivityTypeCode",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "WarehouseCode",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "DateFrom",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "DateTo",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
           {
             "name": "Search",
             "in": "query",
@@ -5217,17 +4978,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceReportSummaryResponsePaginatedResponse"
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceReportSummaryResponsePaginatedResponse"
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceReportSummaryResponsePaginatedResponse"
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
                 }
               }
             }
@@ -5235,106 +4996,15 @@
         }
       }
     },
-    "/api/v1/finance-reports/export": {
+    "/api/v1/finance-reports/{budgetPlanId}": {
       "get": {
         "tags": [
           "FinanceReports"
         ],
+        "summary": "Gets the finance report detail for a budget plan.",
         "parameters": [
           {
-            "name": "ActivityTypeCode",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "WarehouseCode",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "DateFrom",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "DateTo",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "Search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "SortBy",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "SortOrder",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Page",
-            "in": "query",
-            "schema": {
-              "maximum": 2147483647,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "Limit",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/ExportFormat"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/v1/finance-reports/{workOrderId}": {
-      "get": {
-        "tags": [
-          "FinanceReports"
-        ],
-        "parameters": [
-          {
-            "name": "workOrderId",
+            "name": "budgetPlanId",
             "in": "path",
             "required": true,
             "schema": {
@@ -5387,11 +5057,50 @@
         }
       }
     },
+    "/api/v1/finance-reports/{budgetPlanId}/export": {
+      "get": {
+        "tags": [
+          "FinanceReports"
+        ],
+        "summary": "Exports the finance report cost details for a budget plan.",
+        "parameters": [
+          {
+            "name": "budgetPlanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "workOrderId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExportFormat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/items/export": {
       "get": {
         "tags": [
           "Items"
         ],
+        "summary": "Exports items matching the given query.",
         "parameters": [
           {
             "name": "Search",
@@ -5454,6 +5163,7 @@
         "tags": [
           "Items"
         ],
+        "summary": "Gets a paginated list of items.",
         "parameters": [
           {
             "name": "Search",
@@ -5526,6 +5236,7 @@
         "tags": [
           "Items"
         ],
+        "summary": "Gets an item by id.",
         "parameters": [
           {
             "name": "id",
@@ -5586,6 +5297,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Gets a paginated list of the current user's notifications.",
         "parameters": [
           {
             "name": "Page",
@@ -5656,6 +5368,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Marks a notification as read.",
         "parameters": [
           {
             "name": "id",
@@ -5674,11 +5387,25 @@
         }
       }
     },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Marks all of the current user's notifications as read.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/notifications/test": {
       "post": {
         "tags": [
           "Notifications"
         ],
+        "summary": "Sends a test notification to the current user.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5730,6 +5457,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Streams the current user's notifications as server-sent events.",
         "responses": {
           "200": {
             "description": "OK"
@@ -5742,6 +5470,7 @@
         "tags": [
           "Permissions"
         ],
+        "summary": "List all permissions",
         "responses": {
           "200": {
             "description": "OK",
@@ -5766,11 +5495,430 @@
         }
       }
     },
+    "/api/v1/purchase-orders/recap/apdp": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Gets a paginated list of APDP purchase order recaps.",
+        "parameters": [
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/non-apdp": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Gets a paginated list of non-APDP purchase order recaps.",
+        "parameters": [
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedBudgetPlanPoStatusResponsePaginatedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/apdp/{poId}": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Gets the APDP purchase order recap detail by id.",
+        "parameters": [
+          {
+            "name": "poId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/non-apdp/{poId}": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Gets the non-APDP purchase order recap detail by id.",
+        "parameters": [
+          {
+            "name": "poId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponseApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/apdp/{poId}/rfba-pdf": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Exports the RFBA form for an APDP recap purchase order.",
+        "parameters": [
+          {
+            "name": "poId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/apdp/export": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Exports the APDP purchase order recap list.",
+        "parameters": [
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExportFormat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/recap/non-apdp/export": {
+      "get": {
+        "tags": [
+          "PurchaseOrderRecap"
+        ],
+        "summary": "Exports the non-APDP purchase order recap list.",
+        "parameters": [
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExportFormat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/purchase-orders/approved-budget-plans": {
       "get": {
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Gets a paginated list of approved budget plans available for purchase orders.",
         "parameters": [
           {
             "name": "Search",
@@ -5843,6 +5991,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Gets a paginated list of purchase orders.",
         "parameters": [
           {
             "name": "DateFrom",
@@ -5944,6 +6093,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Creates a new purchase order.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6032,6 +6182,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Gets a purchase order by id.",
         "parameters": [
           {
             "name": "id",
@@ -6090,6 +6241,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Updates an existing purchase order.",
         "parameters": [
           {
             "name": "id",
@@ -6187,6 +6339,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Deletes a purchase order by id.",
         "parameters": [
           {
             "name": "id",
@@ -6245,33 +6398,21 @@
         }
       }
     },
-    "/api/v1/purchase-orders/available-items": {
+    "/api/v1/purchase-orders/{id}/pdf": {
       "get": {
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Exports a single purchase order as a printable PDF form.",
+        "description": "Reproduces the ERP PO form. Drafts (not yet sent to SAP) print too, but\nuse the WAMS code instead of a SAP document number and get a DRAFT\nwatermark plus a DRAFT- filename prefix.",
         "parameters": [
           {
-            "name": "vendorShadowId",
-            "in": "query",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "integer",
               "format": "int64"
-            }
-          },
-          {
-            "name": "budgetPlanIds",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeGenerated",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
             }
           }
         ],
@@ -6281,17 +6422,226 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/AvailablePoItemResponseListApiResponse"
+                  "type": "string",
+                  "format": "binary"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AvailablePoItemResponseListApiResponse"
+                  "type": "string",
+                  "format": "binary"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AvailablePoItemResponseListApiResponse"
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/available-items": {
+      "get": {
+        "tags": [
+          "PurchaseOrders"
+        ],
+        "summary": "Gets paginated items available for a purchase order from a seed budget plan.",
+        "description": "`BudgetPlanId` optionally seeds validation and ordering; results may also\n             include same-vendor items from other approved, active plans in accessible warehouses.\n             Each row includes its source plan and warehouse metadata, including\n             `isSeedBudgetPlan`.\n            \n             `takenByCode` is the PO currently holding the item; null means it is selectable.\n             `isGenerated` only indicates that the item is on a Generated PO and does not mean\n             the item is free. With `includeGenerated=false`, taken items are excluded.",
+        "parameters": [
+          {
+            "name": "BudgetPlanId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "VendorShadowId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "IncludeGenerated",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/{purchaseOrderId}/available-items": {
+      "get": {
+        "tags": [
+          "PurchaseOrders"
+        ],
+        "summary": "Gets paginated available items while editing the specified draft purchase order.",
+        "parameters": [
+          {
+            "name": "purchaseOrderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "IncludeGenerated",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailablePoItemResponsePaginatedResponse"
                 }
               }
             }
@@ -6304,6 +6654,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Creates a new purchase order and immediately generates it in SAP.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6387,12 +6738,12 @@
         }
       }
     },
-    "/api/v1/purchase-orders/{id}/generate-apdp": {
+    "/api/v1/purchase-orders/{id}/generate": {
       "post": {
         "tags": [
           "PurchaseOrders"
         ],
-        "summary": "Generates the standalone SAP APDP for RFBA lines in a generated purchase order.",
+        "summary": "Generates an existing purchase order in SAP.",
         "parameters": [
           {
             "name": "id",
@@ -6408,7 +6759,17 @@
           "200": {
             "description": "OK",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderResponseApiResponse"
+                }
+              },
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderResponseApiResponse"
+                }
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PurchaseOrderResponseApiResponse"
                 }
@@ -6418,7 +6779,17 @@
           "400": {
             "description": "Bad Request",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -6428,7 +6799,17 @@
           "404": {
             "description": "Not Found",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -6438,11 +6819,12 @@
         }
       }
     },
-    "/api/v1/purchase-orders/{id}/generate": {
+    "/api/v1/purchase-orders/{id}/generate-apdp": {
       "post": {
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Generates the standalone SAP APDP for the RFBA lines of a generated PO.",
         "parameters": [
           {
             "name": "id",
@@ -6523,6 +6905,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Exports purchase orders matching the given query.",
         "parameters": [
           {
             "name": "DateFrom",
@@ -6616,6 +6999,7 @@
         "tags": [
           "PurchaseOrders"
         ],
+        "summary": "Gets the paginated audit history for a purchase order.",
         "parameters": [
           {
             "name": "id",
@@ -6697,6 +7081,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Returns all vendors that have a submitted rate card covering the given item.\nUsed by the Budget Plan create form to populate the vendor dropdown per line item.",
         "parameters": [
           {
             "name": "itemShadowId",
@@ -6732,11 +7117,53 @@
         }
       }
     },
+    "/api/v1/rate-cards/vendors/{vendorId}/pph": {
+      "get": {
+        "tags": [
+          "RateCards"
+        ],
+        "summary": "Returns SAP's currently-assigned withholding-tax (PPh) codes for a vendor, refreshing\nfrom SAP live on every call. Used by the RateCard create/edit form to pre-select a\ndefault PPh code once the admin picks a vendor - the admin can still override.",
+        "parameters": [
+          {
+            "name": "vendorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxTypeResponseListApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxTypeResponseListApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxTypeResponseListApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/rate-cards/export": {
       "get": {
         "tags": [
           "RateCards"
         ],
+        "summary": "Exports rate cards matching the given filters.",
         "parameters": [
           {
             "name": "status",
@@ -6814,6 +7241,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Gets a paginated list of rate cards.",
         "parameters": [
           {
             "name": "status",
@@ -6899,6 +7327,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Creates a new rate card.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6967,6 +7396,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Gets a rate card by id.",
         "parameters": [
           {
             "name": "id",
@@ -7025,6 +7455,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Updates an existing rate card.",
         "parameters": [
           {
             "name": "id",
@@ -7122,6 +7553,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Deletes a rate card by id.",
         "parameters": [
           {
             "name": "id",
@@ -7185,6 +7617,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Creates a new rate card and immediately submits it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7273,6 +7706,7 @@
         "tags": [
           "RateCards"
         ],
+        "summary": "Submits an existing rate card.",
         "parameters": [
           {
             "name": "id",
@@ -7353,6 +7787,7 @@
         "tags": [
           "Rca"
         ],
+        "summary": "Exports the RCA report as a PDF for the given warehouse and date range.",
         "parameters": [
           {
             "name": "warehouseCode",
@@ -7390,6 +7825,7 @@
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Gets a paginated list of work order recaps.",
         "parameters": [
           {
             "name": "Status",
@@ -7465,6 +7901,7 @@
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Gets a work order recap by id.",
         "parameters": [
           {
             "name": "id",
@@ -7545,6 +7982,7 @@
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Approves a work order recap.",
         "parameters": [
           {
             "name": "id",
@@ -7645,6 +8083,7 @@
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Rejects a work order recap with an optional reason.",
         "parameters": [
           {
             "name": "id",
@@ -7764,6 +8203,7 @@
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Exports work order recaps as a file in the requested format.",
         "parameters": [
           {
             "name": "Status",
@@ -7824,11 +8264,84 @@
         }
       }
     },
+    "/api/v1/recap-work-orders/{id}/export": {
+      "get": {
+        "tags": [
+          "RecapWorkOrders"
+        ],
+        "summary": "Exports one work order recap, including all of its work orders, as a PDF.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/recap-work-orders/{id}/history": {
       "get": {
         "tags": [
           "RecapWorkOrders"
         ],
+        "summary": "Gets the paginated audit history for a work order recap.",
         "parameters": [
           {
             "name": "id",
@@ -7910,6 +8423,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Exports roles as a file in the requested format.",
         "parameters": [
           {
             "name": "Search",
@@ -7972,6 +8486,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "List all roles",
         "parameters": [
           {
             "name": "Search",
@@ -8042,6 +8557,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Create a new role",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8130,6 +8646,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Get role by ID",
         "parameters": [
           {
             "name": "id",
@@ -8188,6 +8705,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Update role information",
         "parameters": [
           {
             "name": "id",
@@ -8285,6 +8803,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Delete role",
         "parameters": [
           {
             "name": "id",
@@ -8365,6 +8884,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Sync (replace) all permissions for a role in one call",
         "parameters": [
           {
             "name": "id",
@@ -8484,6 +9004,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Assign permission to role",
         "parameters": [
           {
             "name": "id",
@@ -8551,6 +9072,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Remove permission from role",
         "parameters": [
           {
             "name": "id",
@@ -8620,6 +9142,7 @@
         "tags": [
           "Spk"
         ],
+        "summary": "Gets a paginated list of SPK records.",
         "parameters": [
           {
             "name": "Type",
@@ -8713,6 +9236,7 @@
         "tags": [
           "Spk"
         ],
+        "summary": "Gets a SPK record by id.",
         "parameters": [
           {
             "name": "id",
@@ -8773,6 +9297,7 @@
         "tags": [
           "Spk"
         ],
+        "summary": "Exports SPK records as a file in the requested format.",
         "parameters": [
           {
             "name": "Type",
@@ -8856,6 +9381,7 @@
         "tags": [
           "Sync"
         ],
+        "summary": "Manually trigger full sync for all master data sources.\nRequires: system.sync.execute permission.",
         "responses": {
           "200": {
             "description": "OK"
@@ -8868,6 +9394,7 @@
         "tags": [
           "Sync"
         ],
+        "summary": "Trigger a specific sync service by name.\ne.g. POST /api/v1/sync/trigger/WarehouseSync",
         "parameters": [
           {
             "name": "serviceName",
@@ -8890,6 +9417,7 @@
         "tags": [
           "Sync"
         ],
+        "summary": "Paginated history of all sync runs.\nRequires: system.sync.read permission.",
         "parameters": [
           {
             "name": "ServiceName",
@@ -8982,6 +9510,7 @@
         "tags": [
           "Sync"
         ],
+        "summary": "Latest sync run per (ServiceName, CompanyCode) pair - for dashboard health cards.\nRequires: system.sync.read permission.",
         "responses": {
           "200": {
             "description": "OK"
@@ -8994,6 +9523,7 @@
         "tags": [
           "TaxTypes"
         ],
+        "summary": "Gets a list of tax types, optionally filtered by category and active status.",
         "parameters": [
           {
             "name": "category",
@@ -9033,72 +9563,6 @@
             }
           }
         }
-      },
-      "post": {
-        "tags": [
-          "TaxTypes"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTaxTypeRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTaxTypeRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTaxTypeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/tax-types/{id}": {
@@ -9106,6 +9570,7 @@
         "tags": [
           "TaxTypes"
         ],
+        "summary": "Gets a tax type by id.",
         "parameters": [
           {
             "name": "id",
@@ -9134,141 +9599,6 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "TaxTypes"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTaxTypeRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTaxTypeRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTaxTypeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaxTypeResponseApiResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "TaxTypes"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectApiResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectApiResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectApiResponse"
                 }
               }
             }
@@ -9301,7 +9631,16 @@
         "tags": [
           "TransportOrders"
         ],
+        "summary": "Gets a paginated list of transport orders.",
         "parameters": [
+          {
+            "name": "BudgetPlanId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "DocNo",
             "in": "query",
@@ -9401,6 +9740,7 @@
         "tags": [
           "TransportOrders"
         ],
+        "summary": "Gets a transport order by id.",
         "parameters": [
           {
             "name": "id",
@@ -9461,7 +9801,16 @@
         "tags": [
           "TransportOrders"
         ],
+        "summary": "Exports transport orders matching the query to a file stream.",
         "parameters": [
+          {
+            "name": "BudgetPlanId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "DocNo",
             "in": "query",
@@ -9551,6 +9900,7 @@
         "tags": [
           "Uoms"
         ],
+        "summary": "Gets a list of units of measure.",
         "parameters": [
           {
             "name": "activeOnly",
@@ -9588,6 +9938,7 @@
         "tags": [
           "Uoms"
         ],
+        "summary": "Creates a new unit of measure.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -9656,6 +10007,7 @@
         "tags": [
           "Uoms"
         ],
+        "summary": "Gets a unit of measure by id.",
         "parameters": [
           {
             "name": "id",
@@ -9714,6 +10066,7 @@
         "tags": [
           "Uoms"
         ],
+        "summary": "Updates an existing unit of measure.",
         "parameters": [
           {
             "name": "id",
@@ -9791,6 +10144,7 @@
         "tags": [
           "Uoms"
         ],
+        "summary": "Deletes a unit of measure by id.",
         "parameters": [
           {
             "name": "id",
@@ -9871,6 +10225,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "List all users with pagination",
         "parameters": [
           {
             "name": "Search",
@@ -9941,6 +10296,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Create a new user",
         "requestBody": {
           "content": {
             "application/json": {
@@ -10029,6 +10385,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Exports users matching the query to a file stream.",
         "parameters": [
           {
             "name": "Search",
@@ -10091,6 +10448,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Get user by ID",
         "parameters": [
           {
             "name": "id",
@@ -10149,6 +10507,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Update user information",
         "parameters": [
           {
             "name": "id",
@@ -10226,6 +10585,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Delete user (soft delete)",
         "parameters": [
           {
             "name": "id",
@@ -10286,6 +10646,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Reset a user's password (admin action, does not require the target's current password)",
         "parameters": [
           {
             "name": "id",
@@ -10385,6 +10746,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Assign role to user",
         "parameters": [
           {
             "name": "id",
@@ -10452,6 +10814,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Remove role from user",
         "parameters": [
           {
             "name": "id",
@@ -10521,6 +10884,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Assign warehouse to user",
         "parameters": [
           {
             "name": "id",
@@ -10607,6 +10971,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Remove warehouse from user",
         "parameters": [
           {
             "name": "id",
@@ -10676,6 +11041,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "List all permission overrides for a user",
         "parameters": [
           {
             "name": "id",
@@ -10716,6 +11082,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Grant an extra permission to a user (beyond their roles)",
         "parameters": [
           {
             "name": "id",
@@ -10804,6 +11171,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Explicitly deny a permission for a user (overrides role grants)",
         "parameters": [
           {
             "name": "id",
@@ -10892,6 +11260,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Remove a user-level permission override (reverts to role default)",
         "parameters": [
           {
             "name": "id",
@@ -10941,6 +11310,7 @@
         "tags": [
           "Users"
         ],
+        "summary": "Get all effective permissions for a user (role grants + user overrides resolved)",
         "parameters": [
           {
             "name": "id",
@@ -10981,6 +11351,7 @@
         "tags": [
           "Vendors"
         ],
+        "summary": "Exports vendors matching the query to a file stream.",
         "parameters": [
           {
             "name": "Search",
@@ -11043,6 +11414,7 @@
         "tags": [
           "Vendors"
         ],
+        "summary": "Gets a paginated list of vendors.",
         "parameters": [
           {
             "name": "Search",
@@ -11115,6 +11487,7 @@
         "tags": [
           "Vendors"
         ],
+        "summary": "Gets a vendor by id.",
         "parameters": [
           {
             "name": "id",
@@ -11175,6 +11548,7 @@
         "tags": [
           "Warehouses"
         ],
+        "summary": "Exports warehouses matching the query to a file stream.",
         "parameters": [
           {
             "name": "ProvinceId",
@@ -11245,6 +11619,7 @@
         "tags": [
           "Warehouses"
         ],
+        "summary": "List warehouses (filtered by user's warehouse access, optional province filter)",
         "parameters": [
           {
             "name": "ProvinceId",
@@ -11325,6 +11700,7 @@
         "tags": [
           "Warehouses"
         ],
+        "summary": "Get distinct location values for the company (scoped to user's accessible warehouses)",
         "responses": {
           "200": {
             "description": "OK",
@@ -11354,6 +11730,7 @@
         "tags": [
           "Warehouses"
         ],
+        "summary": "List active warehouses with no province mapping (global access only)",
         "responses": {
           "200": {
             "description": "OK",
@@ -11403,6 +11780,7 @@
         "tags": [
           "Warehouses"
         ],
+        "summary": "Get warehouse by ID",
         "parameters": [
           {
             "name": "id",
@@ -11483,6 +11861,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Gets the list of supported workflow document types.",
         "responses": {
           "200": {
             "description": "OK",
@@ -11512,6 +11891,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Gets a paginated list of workflow templates.",
         "parameters": [
           {
             "name": "DocType",
@@ -11589,6 +11969,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Creates a new workflow template.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -11657,6 +12038,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Gets a workflow template by id.",
         "parameters": [
           {
             "name": "id",
@@ -11715,6 +12097,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Updates an existing workflow template.",
         "parameters": [
           {
             "name": "id",
@@ -11812,6 +12195,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Deletes a workflow template by id.",
         "parameters": [
           {
             "name": "id",
@@ -11875,6 +12259,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Activates a workflow template.",
         "parameters": [
           {
             "name": "id",
@@ -11918,6 +12303,7 @@
         "tags": [
           "WorkflowTemplates"
         ],
+        "summary": "Deactivates a workflow template.",
         "parameters": [
           {
             "name": "id",
@@ -11961,6 +12347,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Gets a paginated list of approved budget plans available for work order creation.",
         "parameters": [
           {
             "name": "Search",
@@ -12033,6 +12420,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Gets a paginated list of work orders.",
         "parameters": [
           {
             "name": "Status",
@@ -12144,6 +12532,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Gets a work order by id.",
         "parameters": [
           {
             "name": "id",
@@ -12202,6 +12591,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Updates an existing work order.",
         "parameters": [
           {
             "name": "id",
@@ -12299,6 +12689,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Deletes a work order by id.",
         "parameters": [
           {
             "name": "id",
@@ -12357,11 +12748,73 @@
         }
       }
     },
+    "/api/v1/work-orders/{id}/pic": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "summary": "Gets the candidate PICs (persons in charge) available for a work order.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPicCandidateResponseListApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPicCandidateResponseListApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPicCandidateResponseListApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/work-orders/{id}/submit": {
       "post": {
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Submits a work order for approval.",
         "parameters": [
           {
             "name": "id",
@@ -12442,6 +12895,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Exports work orders matching the query to a file stream.",
         "parameters": [
           {
             "name": "Status",
@@ -12543,6 +12997,7 @@
         "tags": [
           "WorkOrders"
         ],
+        "summary": "Gets the paginated audit history for a work order.",
         "parameters": [
           {
             "name": "id",
@@ -12633,6 +13088,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "budgetPlanId": {
+            "type": "integer",
+            "format": "int64"
+          },
           "vendorShadowId": {
             "type": "integer",
             "format": "int64"
@@ -12699,6 +13158,38 @@
           "sortOrder": {
             "type": "integer",
             "format": "int32"
+          },
+          "ppnTaxTypeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ppnRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "pphTaxTypeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "pphRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "ppnAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "pphAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "costTreatment": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -12767,6 +13258,18 @@
             "type": "number",
             "format": "double"
           },
+          "totalPpnAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPphAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxInclusiveGrandTotal": {
+            "type": "number",
+            "format": "double"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -12783,19 +13286,28 @@
           "generatedByName": {
             "type": "string",
             "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "ApBudgetPlanLinkInfo": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
           },
-          "code": {
-            "type": "string",
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalRealization": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           }
         },
@@ -12898,6 +13410,71 @@
         },
         "additionalProperties": false
       },
+      "AccountPayableTotalsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountPayableItemResponse"
+            },
+            "nullable": true
+          },
+          "dppTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPpnAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPphAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxInclusiveGrandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalRealization": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalVariance": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountPayableTotalsResponseApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccountPayableTotalsResponse"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ActivityTypeResponse": {
         "type": "object",
         "properties": {
@@ -12973,14 +13550,28 @@
         },
         "additionalProperties": false
       },
-      "ApprovalStageResponse": {
+      "ApBudgetPlanLinkInfo": {
         "type": "object",
         "properties": {
-          "stageOrder": {
+          "id": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
-          "stageName": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApLinkInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
             "type": "string",
             "nullable": true
           },
@@ -12988,12 +13579,11 @@
             "type": "string",
             "nullable": true
           },
-          "approvedAt": {
+          "sapApNumber": {
             "type": "string",
-            "format": "date-time",
             "nullable": true
           },
-          "approvedByName": {
+          "vendorCode": {
             "type": "string",
             "nullable": true
           }
@@ -13012,14 +13602,6 @@
             "nullable": true
           },
           "templateCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityTypeCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityTypeName": {
             "type": "string",
             "nullable": true
           },
@@ -13055,6 +13637,9 @@
             "nullable": true
           },
           "isLocked": {
+            "type": "boolean"
+          },
+          "allSubmitted": {
             "type": "boolean"
           },
           "activities": {
@@ -13163,6 +13748,9 @@
           "budgetVariance": {
             "type": "number",
             "format": "double"
+          },
+          "allGenerated": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -13233,22 +13821,15 @@
             "type": "number",
             "format": "double"
           },
-          "accountPayableId": {
-            "type": "integer",
-            "format": "int64",
+          "accountPayables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApLinkInfo"
+            },
             "nullable": true
           },
-          "accountPayableCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "accountPayableStatus": {
-            "type": "string",
-            "nullable": true
-          },
-          "sapApNumber": {
-            "type": "string",
-            "nullable": true
+          "isAllGenerated": {
+            "type": "boolean"
           },
           "location": {
             "type": "string",
@@ -13495,6 +14076,14 @@
           },
           "isGenerated": {
             "type": "boolean"
+          },
+          "takenByCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13542,6 +14131,37 @@
             "type": "string",
             "nullable": true
           },
+          "budgetPlanDocDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isSeedBudgetPlan": {
+            "type": "boolean"
+          },
+          "warehouseShadowId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "vendorShadowId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vendorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "vendorName": {
+            "type": "string",
+            "nullable": true
+          },
           "itemShadowId": {
             "type": "integer",
             "format": "int64"
@@ -13559,14 +14179,6 @@
             "nullable": true
           },
           "coaName": {
-            "type": "string",
-            "nullable": true
-          },
-          "vendorCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "vendorName": {
             "type": "string",
             "nullable": true
           },
@@ -13595,11 +14207,19 @@
           },
           "isGenerated": {
             "type": "boolean"
+          },
+          "takenByCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "AvailablePoItemResponseListApiResponse": {
+      "AvailablePoItemResponsePaginatedResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -13612,9 +14232,8 @@
             },
             "nullable": true
           },
-          "message": {
-            "type": "string",
-            "nullable": true
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
           },
           "requestId": {
             "type": "string",
@@ -13786,10 +14405,6 @@
           "isRfba": {
             "type": "boolean"
           },
-          "paymentType": {
-            "type": "string",
-            "nullable": true
-          },
           "docExternal": {
             "type": "string",
             "nullable": true
@@ -13804,8 +14419,7 @@
           },
           "activityTypeId": {
             "type": "integer",
-            "format": "int64",
-            "nullable": true
+            "format": "int64"
           },
           "activityTypeCode": {
             "type": "string",
@@ -14133,6 +14747,9 @@
           },
           "approval": {
             "$ref": "#/components/schemas/BudgetPlanApprovalInfo"
+          },
+          "isRfba": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -14176,105 +14793,6 @@
         },
         "additionalProperties": false
       },
-      "BudgetRevisionResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "budgetPlanId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "recapWorkOrderId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "originalTotal": {
-            "type": "number",
-            "format": "double"
-          },
-          "revisedTotal": {
-            "type": "number",
-            "format": "double"
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
-          "submittedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reviewedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "rejectionReason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "BudgetRevisionResponseApiResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/BudgetRevisionResponse"
-          },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "requestId": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "BudgetRevisionResponseListApiResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BudgetRevisionResponse"
-            },
-            "nullable": true
-          },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "requestId": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "BudgetTemplateItemResponse": {
         "type": "object",
         "properties": {
@@ -14308,8 +14826,7 @@
           },
           "activityTypeId": {
             "type": "integer",
-            "format": "int64",
-            "nullable": true
+            "format": "int64"
           },
           "activityTypeCode": {
             "type": "string",
@@ -14332,9 +14849,6 @@
           "templateCode": {
             "type": "string",
             "nullable": true
-          },
-          "activityType": {
-            "$ref": "#/components/schemas/ActivityTypeResponse"
           },
           "provinceId": {
             "type": "integer",
@@ -14411,10 +14925,6 @@
             "type": "string",
             "nullable": true
           },
-          "activityTypeName": {
-            "type": "string",
-            "nullable": true
-          },
           "provinceId": {
             "type": "integer",
             "format": "int64",
@@ -14439,10 +14949,6 @@
             "format": "int64"
           },
           "templateCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityTypeName": {
             "type": "string",
             "nullable": true
           },
@@ -14604,6 +15110,10 @@
               "format": "int64"
             },
             "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -14631,8 +15141,7 @@
           },
           "activityTypeId": {
             "type": "integer",
-            "format": "int64",
-            "nullable": true
+            "format": "int64"
           },
           "vendorShadowId": {
             "type": "integer",
@@ -14652,9 +15161,6 @@
           },
           "isRfba": {
             "type": "boolean"
-          },
-          "paymentType": {
-            "$ref": "#/components/schemas/PaymentType"
           },
           "billOfLading": {
             "type": "string",
@@ -14723,8 +15229,7 @@
           },
           "activityTypeId": {
             "type": "integer",
-            "format": "int64",
-            "nullable": true
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -14732,10 +15237,6 @@
       "CreateBudgetTemplateRequest": {
         "type": "object",
         "properties": {
-          "activityTypeId": {
-            "type": "integer",
-            "format": "int64"
-          },
           "provinceId": {
             "type": "integer",
             "format": "int64",
@@ -15154,27 +15655,6 @@
         },
         "additionalProperties": false
       },
-      "CreateTaxTypeRequest": {
-        "type": "object",
-        "properties": {
-          "category": {
-            "$ref": "#/components/schemas/TaxCategory"
-          },
-          "code": {
-            "type": "string",
-            "nullable": true
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "rate": {
-            "type": "number",
-            "format": "double"
-          }
-        },
-        "additionalProperties": false
-      },
       "CreateUnbaggingDetailRequest": {
         "type": "object",
         "properties": {
@@ -15320,11 +15800,6 @@
           },
           "employeeId": {
             "type": "string",
-            "nullable": true
-          },
-          "companyId": {
-            "type": "integer",
-            "format": "int64",
             "nullable": true
           },
           "warehouseIds": {
@@ -15751,38 +16226,53 @@
         },
         "additionalProperties": false
       },
-      "FinanceReportDetailResponse": {
+      "FinanceReportBudgetRecapResponse": {
         "type": "object",
         "properties": {
-          "workOrderId": {
+          "budgetPlan": {
+            "type": "number",
+            "format": "double"
+          },
+          "budgetRealization": {
+            "type": "number",
+            "format": "double"
+          },
+          "budgetVariance": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FinanceReportCostDetailResponse": {
+        "type": "object",
+        "properties": {
+          "purchaseOrderItemId": {
             "type": "integer",
             "format": "int64"
           },
-          "sapId": {
+          "workOrderId": {
             "type": "string",
             "nullable": true
           },
-          "vesselName": {
+          "blNumber": {
             "type": "string",
             "nullable": true
           },
-          "warehouseCode": {
+          "vessel": {
             "type": "string",
             "nullable": true
           },
-          "picName": {
+          "product": {
             "type": "string",
             "nullable": true
           },
-          "submittedAt": {
+          "pic": {
             "type": "string",
-            "format": "date-time",
             "nullable": true
           },
-          "approvalDate": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+          "isRfba": {
+            "type": "boolean"
           },
           "startDate": {
             "type": "string",
@@ -15794,40 +16284,74 @@
             "format": "date-time",
             "nullable": true
           },
-          "notes": {
+          "totalPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "isPpnApplied": {
+            "type": "boolean"
+          },
+          "ppnRatePercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPricePpn": {
+            "type": "number",
+            "format": "double"
+          },
+          "isPphApplied": {
+            "type": "boolean"
+          },
+          "pphType": {
             "type": "string",
             "nullable": true
           },
-          "approvalStages": {
+          "totalPricePph": {
+            "type": "number",
+            "format": "double"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FinanceReportDetailResponse": {
+        "type": "object",
+        "properties": {
+          "header": {
+            "$ref": "#/components/schemas/FinanceReportHeaderResponse"
+          },
+          "costDetails": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ApprovalStageResponse"
+              "$ref": "#/components/schemas/FinanceReportCostDetailResponse"
             },
             "nullable": true
           },
-          "products": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductResponse"
-            },
-            "nullable": true
+          "dpp": {
+            "type": "number",
+            "format": "double"
           },
-          "transports": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransportResponse"
-            },
-            "nullable": true
+          "totalPpn": {
+            "type": "number",
+            "format": "double"
           },
-          "weight": {
-            "$ref": "#/components/schemas/WeightResponse"
+          "totalPph": {
+            "type": "number",
+            "format": "double"
           },
-          "photos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FileAttachmentResponse"
-            },
-            "nullable": true
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "budgetRecap": {
+            "$ref": "#/components/schemas/FinanceReportBudgetRecapResponse"
           }
         },
         "additionalProperties": false
@@ -15852,34 +16376,18 @@
         },
         "additionalProperties": false
       },
-      "FinanceReportSummaryResponse": {
+      "FinanceReportHeaderResponse": {
         "type": "object",
         "properties": {
-          "workOrderId": {
+          "budgetPlanId": {
             "type": "integer",
             "format": "int64"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "sapId": {
+          "budgetNo": {
             "type": "string",
             "nullable": true
           },
-          "vesselName": {
-            "type": "string",
-            "nullable": true
-          },
-          "warehouseCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityTypeName": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityTypeCode": {
+          "templateId": {
             "type": "string",
             "nullable": true
           },
@@ -15887,31 +16395,23 @@
             "type": "string",
             "nullable": true
           },
-          "approvalDate": {
+          "remark": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "FinanceReportSummaryResponsePaginatedResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FinanceReportSummaryResponse"
-            },
             "nullable": true
           },
-          "meta": {
-            "$ref": "#/components/schemas/PaginationMeta"
+          "docDate": {
+            "type": "string",
+            "format": "date-time"
           },
-          "requestId": {
+          "warehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
             "type": "string",
             "nullable": true
           }
@@ -16328,6 +16828,10 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          },
+          "route": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16397,22 +16901,6 @@
         },
         "additionalProperties": false
       },
-      "PaymentType": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "value": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          }
-        },
-        "additionalProperties": false
-      },
       "PermissionInfo": {
         "type": "object",
         "properties": {
@@ -16463,6 +16951,21 @@
         },
         "additionalProperties": false
       },
+      "PoApprover": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PoLinkInfo": {
         "type": "object",
         "properties": {
@@ -16477,6 +16980,28 @@
           "status": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PreviewAccountPayableRequest": {
+        "type": "object",
+        "properties": {
+          "vendorShadowId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -16508,28 +17033,6 @@
         },
         "additionalProperties": { }
       },
-      "ProductResponse": {
-        "type": "object",
-        "properties": {
-          "productName": {
-            "type": "string",
-            "nullable": true
-          },
-          "quantity": {
-            "type": "number",
-            "format": "double"
-          },
-          "uomCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "activityName": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "ProvinceOption": {
         "type": "object",
         "properties": {
@@ -16542,6 +17045,34 @@
             "nullable": true
           },
           "display": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseOrderApdpResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "sapDocEntry": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "error": {
             "type": "string",
             "nullable": true
           }
@@ -16747,36 +17278,15 @@
             "type": "string",
             "nullable": true
           },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoApprover"
+            },
+            "nullable": true
+          },
           "apdp": {
             "$ref": "#/components/schemas/PurchaseOrderApdpResponse"
-          }
-        },
-        "additionalProperties": false
-      },
-      "PurchaseOrderApdpResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
-          "sapDocEntry": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "amount": {
-            "type": "number",
-            "format": "double"
-          },
-          "generatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "error": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17038,10 +17548,6 @@
             "type": "string",
             "nullable": true
           },
-          "templateName": {
-            "type": "string",
-            "nullable": true
-          },
           "budgetPlanStatus": {
             "type": "string",
             "nullable": true
@@ -17161,6 +17667,95 @@
           "budgetVariance": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecapPurchaseOrderDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "vendorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "generatedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedBudgetPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BpLinkInfo"
+            },
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderItemResponse"
+            },
+            "nullable": true
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalItems": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecapPurchaseOrderDetailResponseApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RecapPurchaseOrderDetailResponse"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17513,16 +18108,6 @@
         },
         "additionalProperties": false
       },
-      "RejectBudgetRevisionRequest": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "RejectRecapRequest": {
         "type": "object",
         "properties": {
@@ -17770,24 +18355,6 @@
         },
         "additionalProperties": false
       },
-      "SubmitBudgetRevisionRequest": {
-        "type": "object",
-        "properties": {
-          "recapWorkOrderId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "revisedTotal": {
-            "type": "number",
-            "format": "double"
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "SyncOutcome": {
         "enum": [
           0,
@@ -17808,22 +18375,6 @@
               "format": "int64"
             },
             "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "TaxCategory": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "value": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -17938,10 +18489,6 @@
             "type": "string",
             "nullable": true
           },
-          "docDate": {
-            "type": "string",
-            "format": "date"
-          },
           "type": {
             "type": "string",
             "nullable": true
@@ -17958,15 +18505,11 @@
             "type": "string",
             "nullable": true
           },
+          "vehicleType": {
+            "type": "string",
+            "nullable": true
+          },
           "blNo": {
-            "type": "string",
-            "nullable": true
-          },
-          "containerNo": {
-            "type": "string",
-            "nullable": true
-          },
-          "sealNo": {
             "type": "string",
             "nullable": true
           },
@@ -18039,24 +18582,6 @@
             "$ref": "#/components/schemas/PaginationMeta"
           },
           "requestId": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "TransportResponse": {
-        "type": "object",
-        "properties": {
-          "noVehicle": {
-            "type": "string",
-            "nullable": true
-          },
-          "noContainer": {
-            "type": "string",
-            "nullable": true
-          },
-          "noSeal": {
             "type": "string",
             "nullable": true
           }
@@ -18147,6 +18672,11 @@
               "format": "int64"
             },
             "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18207,11 +18737,6 @@
       "UpdateBudgetTemplateRequest": {
         "type": "object",
         "properties": {
-          "activityTypeId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
           "provinceId": {
             "type": "integer",
             "format": "int64",
@@ -18320,20 +18845,6 @@
         },
         "additionalProperties": false
       },
-      "UpdateTaxTypeRequest": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "nullable": true
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "UpdateUomRequest": {
         "type": "object",
         "properties": {
@@ -18430,12 +18941,6 @@
           "storage": {
             "$ref": "#/components/schemas/CreateStorageDetailRequest"
           },
-          "opname": {
-            "$ref": "#/components/schemas/CreateStorageDetailRequest"
-          },
-          "others": {
-            "$ref": "#/components/schemas/CreateStorageDetailRequest"
-          },
           "qc": {
             "$ref": "#/components/schemas/CreateQcDetailRequest"
           },
@@ -18447,6 +18952,12 @@
           },
           "rebagging": {
             "$ref": "#/components/schemas/CreateRebaggingDetailRequest"
+          },
+          "opname": {
+            "$ref": "#/components/schemas/CreateStorageDetailRequest"
+          },
+          "others": {
+            "$ref": "#/components/schemas/CreateStorageDetailRequest"
           }
         },
         "additionalProperties": false
@@ -18945,37 +19456,6 @@
         },
         "additionalProperties": false
       },
-      "WeightResponse": {
-        "type": "object",
-        "properties": {
-          "initialWeight": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "finalWeight": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "totalBag": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "unitWeight": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "totalWeight": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "WorkOrderFumigationDetailResponse": {
         "type": "object",
         "properties": {
@@ -19143,6 +19623,44 @@
         },
         "additionalProperties": false
       },
+      "WorkOrderPicCandidateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fullname": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderPicCandidateResponseListApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderPicCandidateResponse"
+            },
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkOrderQcDetailResponse": {
         "type": "object",
         "properties": {
@@ -19266,7 +19784,8 @@
           },
           "picUserId": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "nullable": true
           },
           "picName": {
             "type": "string",
@@ -19949,9 +20468,6 @@
       "name": "BudgetPlans"
     },
     {
-      "name": "BudgetRevisions"
-    },
-    {
       "name": "BudgetTemplates"
     },
     {
@@ -19974,6 +20490,9 @@
     },
     {
       "name": "Permissions"
+    },
+    {
+      "name": "PurchaseOrderRecap"
     },
     {
       "name": "PurchaseOrders"
