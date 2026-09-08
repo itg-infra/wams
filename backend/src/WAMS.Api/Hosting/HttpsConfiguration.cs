@@ -23,6 +23,29 @@ public sealed record HttpsConfiguration(
         if (string.IsNullOrWhiteSpace(certificatePassword))
             throw new InvalidOperationException("HTTPS_CERT_PASSWORD is required when HTTPS=true");
 
+        certificatePath = ResolveCertificatePath(certificatePath);
+
         return new HttpsConfiguration(true, port, certificatePath, certificatePassword);
+    }
+
+    private static string ResolveCertificatePath(string path)
+    {
+        if (File.Exists(path))
+            return path;
+        if (!Directory.Exists(path))
+            throw new InvalidOperationException($"HTTPS certificate path does not exist: {path}");
+
+        var certificates = Directory.EnumerateFiles(path)
+            .Where(file => string.Equals(Path.GetExtension(file), ".pfx", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return certificates.Length switch
+        {
+            0 => throw new InvalidOperationException($"HTTPS certificate directory contains no .pfx files: {path}"),
+            1 => certificates[0],
+            _ => throw new InvalidOperationException(
+                $"HTTPS certificate directory contains {certificates.Length} .pfx files: {path}. " +
+                "Set HTTPS_CERT_PATH to the exact .pfx file to use.")
+        };
     }
 }

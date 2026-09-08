@@ -63,10 +63,14 @@ Jika certificate dari client berupa PFX, tambahkan ke `backend\.env`:
 ```env
 PORT=8121
 HTTPS=true
-HTTPS_CERT_PATH=C:/WAMS/certificates/wams.pfx
+HTTPS_CERT_PATH=C:/WAMS/certificates
 HTTPS_CERT_PASSWORD=PASSWORD_PFX
 CORS__Origins=https://DOMAIN_CLIENT:8120
 ```
+
+`HTTPS_CERT_PATH` dapat menunjuk langsung ke file `.pfx` atau ke folder yang
+berisi tepat satu file `.pfx`. Folder kosong atau folder dengan beberapa file
+`.pfx` menghasilkan pesan error yang menjelaskan masalahnya.
 
 `run.ps1` memuat nilai tersebut sebelum menjalankan backend. Jika `HTTPS=false`,
 backend tetap menggunakan HTTP seperti sebelumnya.
@@ -127,7 +131,7 @@ sama, gunakan:
 ```env
 FRONTEND_PORT=8120
 HTTPS=true
-HTTPS_CERT_PATH=C:/WAMS/certificates/wams.pfx
+HTTPS_CERT_PATH=C:/WAMS/certificates
 HTTPS_CERT_PASSWORD=PASSWORD_PFX
 VITE_API_URL=https://DOMAIN_CLIENT:8121/
 VITE_API_URL_TEST=https://DOMAIN_CLIENT:8121/
