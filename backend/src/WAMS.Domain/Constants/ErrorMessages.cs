@@ -195,6 +195,8 @@ public static class ErrorMessages
         public static string EmailConflict(string email) => $"User with email '{email}' already exists";
         public static string AlreadyHasRole(string name) => $"User already has role '{name}'";
         public const string AlreadyAssignedToCompany = "User is already assigned to this company";
+        public const string SuperAdminMutationDenied = "Only a super administrator can modify a super administrator account";
+        public const string LastActiveSuperAdmin = "At least one active super administrator must remain";
     }
 
     public static class Role

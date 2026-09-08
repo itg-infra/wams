@@ -33,7 +33,8 @@ public class TokenService : ITokenService
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new("fullname", user.Fullname),
-            new("company_id", companyId.ToString())
+            new("company_id", companyId.ToString()),
+            new("session_version", user.SessionVersion.ToString())
         };
 
         foreach (var role in roles)

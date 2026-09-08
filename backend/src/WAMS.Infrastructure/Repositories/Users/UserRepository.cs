@@ -29,6 +29,7 @@ public class UserRepository : IUserRepository
         => await _db.Users
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
+            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
     /// <summary>
@@ -58,8 +59,7 @@ public class UserRepository : IUserRepository
             var pattern = LikePatternHelper.ToContainsPattern(q.Search);
             baseQuery = baseQuery.Where(u =>
                 EF.Functions.ILike(u.Email, pattern, "\\") ||
-                EF.Functions.ILike(u.Fullname, pattern, "\\") ||
-                (u.EmployeeId != null && EF.Functions.ILike(u.EmployeeId, pattern, "\\")));
+                EF.Functions.ILike(u.Fullname, pattern, "\\"));
         }
 
         baseQuery = (q.SortBy?.ToLowerInvariant(), q.SortOrder?.ToLowerInvariant() == "desc") switch
@@ -68,8 +68,6 @@ public class UserRepository : IUserRepository
             ("email", false) => baseQuery.OrderBy(u => u.Email),
             ("fullname", true) => baseQuery.OrderByDescending(u => u.Fullname),
             ("fullname", false) => baseQuery.OrderBy(u => u.Fullname),
-            ("employeeid", true) => baseQuery.OrderByDescending(u => u.EmployeeId),
-            ("employeeid", false) => baseQuery.OrderBy(u => u.EmployeeId),
             ("isactive", true) => baseQuery.OrderByDescending(u => u.IsActive),
             ("isactive", false) => baseQuery.OrderBy(u => u.IsActive),
             ("createdat", true) => baseQuery.OrderByDescending(u => u.CreatedAt),
@@ -100,8 +98,7 @@ public class UserRepository : IUserRepository
             var pattern = LikePatternHelper.ToContainsPattern(q.Search);
             baseQuery = baseQuery.Where(u =>
                 EF.Functions.ILike(u.Email, pattern, "\\") ||
-                EF.Functions.ILike(u.Fullname, pattern, "\\") ||
-                (u.EmployeeId != null && EF.Functions.ILike(u.EmployeeId, pattern, "\\")));
+                EF.Functions.ILike(u.Fullname, pattern, "\\"));
         }
 
         baseQuery = (q.SortBy?.ToLowerInvariant(), q.SortOrder?.ToLowerInvariant() == "desc") switch
@@ -110,8 +107,6 @@ public class UserRepository : IUserRepository
             ("email", false) => baseQuery.OrderBy(u => u.Email),
             ("fullname", true) => baseQuery.OrderByDescending(u => u.Fullname),
             ("fullname", false) => baseQuery.OrderBy(u => u.Fullname),
-            ("employeeid", true) => baseQuery.OrderByDescending(u => u.EmployeeId),
-            ("employeeid", false) => baseQuery.OrderBy(u => u.EmployeeId),
             ("isactive", true) => baseQuery.OrderByDescending(u => u.IsActive),
             ("isactive", false) => baseQuery.OrderBy(u => u.IsActive),
             ("createdat", true) => baseQuery.OrderByDescending(u => u.CreatedAt),
@@ -125,12 +120,12 @@ public class UserRepository : IUserRepository
                 u.Id,
                 u.Email,
                 u.Fullname,
-                u.EmployeeId,
                 u.IsActive,
                 u.CreatedAt,
                 u.UserRoles.Select(ur => new UserRoleInfo(ur.RoleId, ur.Role.Name, ur.Role.DisplayName)).ToList(),
                 u.UserWarehouses.Select(uw => new UserWarehouseInfo(uw.WarehouseId, uw.Warehouse.Code, uw.Warehouse.Name, uw.IsPrimary)).ToList(),
-                u.UserProvinces.Select(up => new UserProvinceInfo(up.ProvinceId, up.Province.Name, up.Province.Display)).ToList()))
+                u.UserProvinces.Select(up => new UserProvinceInfo(up.ProvinceId, up.Province.Name, up.Province.Display)).ToList(),
+                u.EmployeeId))
             .AsNoTracking()
             .AsAsyncEnumerable();
     }
@@ -146,6 +141,17 @@ public class UserRepository : IUserRepository
         _db.Users.Update(user);
         return Task.CompletedTask;
     }
+
+    public async Task IncrementSessionVersionAsync(long userId, CancellationToken ct = default)
+        => await _db.Users.Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessionVersion, u => u.SessionVersion + 1)
+                .SetProperty(u => u.UpdatedAt, DateTime.UtcNow), ct);
+
+    public Task<int> CountActiveSuperAdminsAsync(CancellationToken ct = default)
+        => _db.Users.IgnoreQueryFilters()
+            .Where(u => u.DeletedAt == null && u.IsActive &&
+                u.UserRoles.Any(ur => ur.Role.Name == RoleCodes.SuperAdmin))
+            .CountAsync(ct);
 
     public async Task SoftDeleteAsync(long id, CancellationToken ct = default)
         => await _db.Users
@@ -355,6 +361,21 @@ public class UserRepository : IUserRepository
     {
         return await _db.Users
             .IgnoreQueryFilters()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Where(u => u.DeletedAt == null)
+            .FirstOrDefaultAsync(u => u.Id == id, ct);
+    }
+
+    /// <summary>
+    /// Get user by ID bypassing tenant filtering without adding the entity to the change tracker.
+    /// Use this for authorization and token/session validation reads.
+    /// </summary>
+    public async Task<User?> GetByIdUnfilteredReadOnlyAsync(long id, CancellationToken ct = default)
+    {
+        return await _db.Users
+            .IgnoreQueryFilters()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .AsNoTracking()
             .Where(u => u.DeletedAt == null)
             .FirstOrDefaultAsync(u => u.Id == id, ct);
     }

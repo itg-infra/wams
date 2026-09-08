@@ -231,6 +231,18 @@ public partial class DatabaseSeeder
             return;
         }
 
+        // Configuration is create-only. Once any SUPER_ADMIN exists in the initial company,
+        // changing InitialAdmin credentials must never create a second privileged account.
+        if (
+            await _context.Users.IgnoreQueryFilters().AnyAsync(u =>
+                u.CompanyId == companyId && u.DeletedAt == null && u.UserRoles.Any(ur => ur.Role.Name == RoleCodes.SuperAdmin)
+            )
+        )
+        {
+            _logger.LogInformation("A SUPER_ADMIN already exists in the initial company, skipping initial admin creation");
+            return;
+        }
+
         _logger.LogInformation("Creating initial admin user: {Email}", adminEmail);
 
         // Use IgnoreQueryFilters - no tenant context during seeding

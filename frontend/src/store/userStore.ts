@@ -6,13 +6,14 @@ import type {
     UpdateUserPayload,
     UserListParams,
     UserState,
+    User,
 } from "../types/users.types";
 
 interface UserStoreState extends UserState {
     // Create
     isCreating: boolean;
     createError: string | null;
-    createUser: (payload: CreateUserPayload) => Promise<boolean>;
+    createUser: (payload: CreateUserPayload) => Promise<User | null>;
     clearCreatesuccess: ()=> void;
     clearCreateError: () => void;
 
@@ -21,6 +22,7 @@ interface UserStoreState extends UserState {
     updateError: string | null;
     updateUser: (id: number, payload: UpdateUserPayload) => Promise<boolean>;
     clearUpdateError: () => void;
+    resetUserPassword: (id: number, newPassword: string) => Promise<boolean>;
 
     // Delete
     isDeleting: boolean;
@@ -31,7 +33,7 @@ interface UserStoreState extends UserState {
     // state
     isAssigningRole: boolean,
     isRemovingRole: boolean,
-    assignRoleToUser: (userId: number, roleId: number) => Promise<void>;
+    assignRoleToUser: (userId: number, roleId: number) => Promise<boolean>;
     removeRoleFromUser: (userId: number, roleId: number) => Promise<void>;
 
 
@@ -82,15 +84,15 @@ export const useUserStore = create<UserStoreState>()(
                     const response = await userService.createUser(payload);
                     if (!response.success) {
                         set({ isCreating: false, createError: response.message ?? "Failed to create user." });
-                        return false;
+                        return null;
                     }
                     set({ isCreating: false });
                     await get().fetchUsers({ page: 1 });
-                    return true;
+                    return response.data ?? null;
                 } catch (err: unknown) {
                     const e = err as { response?: { data?: { message?: string } } };
                     set({ isCreating: false, createError: e?.response?.data?.message ?? "Failed to create user." });
-                    return false;
+                    return null;
                 }
             },
 
@@ -120,6 +122,21 @@ export const useUserStore = create<UserStoreState>()(
             },
 
             clearUpdateError: () => set({ updateError: null }),
+
+            resetUserPassword: async (id, newPassword) => {
+                try {
+                    const response = await userService.resetPassword(id, newPassword);
+                    if (!response.success) {
+                        set({ updateError: response.message ?? "Failed to reset password." });
+                        return false;
+                    }
+                    return true;
+                } catch (err: unknown) {
+                    const e = err as { response?: { data?: { message?: string } } };
+                    set({ updateError: e?.response?.data?.message ?? "Failed to reset password." });
+                    return false;
+                }
+            },
 
             // ── Delete ─────────────────────────────────────────────────────
             isDeleting: false,
@@ -156,8 +173,10 @@ export const useUserStore = create<UserStoreState>()(
                     await userService.assignRole(userId, roleId);
 
                     await get().fetchUsers();
+                    return true;
                 } catch (err) {
                     console.error("Assign role failed", err);
+                    return false;
                 } finally {
                     set({ isAssigningRole: false });
                 }

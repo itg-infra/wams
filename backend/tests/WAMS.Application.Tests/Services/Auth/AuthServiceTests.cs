@@ -311,6 +311,41 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task UpdateProfileAsync_WithEmail_VerifiesCurrentPasswordNormalizesAndAudits()
+    {
+        var user = TestBuilders.ActiveUser(id: 1, email: "old@example.com");
+        _userRepo.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepo.GetByEmailAsync("new@example.com", Arg.Any<CancellationToken>()).ReturnsNull();
+        _hasher.Verify("oldpass1", "hashed").Returns(true);
+        _rbacRepo.GetUserPermissionKeysAsync(1, Arg.Any<CancellationToken>()).Returns([]);
+
+        var result = await _sut.UpdateProfileAsync(
+            1,
+            new UpdateProfileRequest("Alice Updated", "  NEW@example.com ", "oldpass1"),
+            TestContext.Current.CancellationToken);
+
+        result.Email.Should().Be("new@example.com");
+        result.Fullname.Should().Be("Alice Updated");
+        user.Email.Should().Be("new@example.com");
+        user.Fullname.Should().Be("Alice Updated");
+        await _userRepo.Received(1).UpdateAsync(user, Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+        await _auditLogWriter.Received(1).LogAsync(
+            action: "CHANGE_EMAIL",
+            tableName: "users",
+            recordId: 1,
+            userId: 1,
+            userEmail: "new@example.com",
+            userFullname: "Alice Updated",
+            companyId: 1,
+            ipAddress: Arg.Any<string?>(),
+            userAgent: Arg.Any<string?>(),
+            oldValues: Arg.Any<string?>(),
+            newValues: Arg.Any<string?>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ChangePasswordAsync_WithCorrectPasswordAndNoRefreshToken_RevokesAllTokensAndCommits()
     {
         var user = TestBuilders.ActiveUser(id: 1);
@@ -340,18 +375,16 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task ChangePasswordAsync_WithRefreshTokenProvided_ExcludesThatTokenFromRevocation()
+    public async Task ChangePasswordAsync_WithRefreshTokenProvided_RevokesEverySession()
     {
         var user = TestBuilders.ActiveUser(id: 1);
         _userRepo.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(user);
         _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
-        var currentToken = new RefreshToken { Id = 55, UserId = 1, TokenHash = AuthService.HashToken("current-refresh") };
-        _authRepo.GetRefreshTokenByHashAsync(AuthService.HashToken("current-refresh"), Arg.Any<CancellationToken>())
-            .Returns(currentToken);
-
         await _sut.ChangePasswordAsync(1, new ChangePasswordRequest("oldpass1", "newpassword1", "current-refresh"), TestContext.Current.CancellationToken);
 
-        await _authRepo.Received(1).RevokeAllUserTokensAsync(1, 55, Arg.Any<CancellationToken>());
+        await _authRepo.DidNotReceive().GetRefreshTokenByHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _authRepo.Received(1).RevokeAllUserTokensAsync(1, null, Arg.Any<CancellationToken>());
+        await _userRepo.Received(1).IncrementSessionVersionAsync(1, Arg.Any<CancellationToken>());
     }
 
     // GetCurrentUserAsync

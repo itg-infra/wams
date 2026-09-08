@@ -10,11 +10,16 @@ import { CostRowRecap } from "../components/costRows";
 import { formatDate } from "../components/format/dateTimeFormat";
 import { RejectModal } from "./detailBudgetPlanScreen";
 import type { RejectRecapPayload } from "../types/recapWo.type";
-import { createBudgetRevision } from "../api/services/operationalRealization/detailRecapWoService";
+import {
+  createBudgetRevision,
+  realizationRecapDetailService,
+} from "../api/services/operationalRealization/detailRecapWoService";
 import { PageHeader } from "../components/ui/page-header";
 import { Button } from "../components/ui/button";
 import toast from "react-hot-toast";
 import { COST_GRID_COLS_PLAN_REAL } from "../components/gridCols";
+import { Download } from "lucide-react";
+import PermissionGuard from "../components/guards/permissionGuard";
 
 // const COST_GRID_COLS =
 //   "grid-cols-[120px_180px_120px_140px_160px_180px_100px_350px_140px_120px_150px_180px_180px_180px_140px_220px]";
@@ -46,6 +51,7 @@ export default function RecapWoPlanReal() {
   const [showRejectRevisionModal, setShowRejectRevisionModal] = useState(false);
 
   const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [revisedTotal, setRevisedTotal] = useState(
     realization?.budgetPlanTotal ?? 0,
@@ -100,6 +106,29 @@ export default function RecapWoPlanReal() {
     setShowRevisionModal(false);
 
     fetchDetail(Number(id));
+  };
+
+  const handleExportPdf = async () => {
+    const recapId = Number(id);
+    if (!Number.isFinite(recapId)) return;
+
+    try {
+      setIsExporting(true);
+      const file = await realizationRecapDetailService.exportPdf(recapId);
+      const url = window.URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Recap-WO-${plan?.header.budgetNo ?? recapId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Recap Work Order export failed:", error);
+      toast.error("Failed to export Recap Work Order PDF");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const getStatusClass = (status: string) => {
@@ -222,7 +251,24 @@ export default function RecapWoPlanReal() {
 
       <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex flex-col overflow-x-hidden">
         <div className="w-full">
-          <PageHeader title="Recap Work Orders" onBack={() => navigate(-1)} />
+          <PageHeader
+            title="Recap Work Orders"
+            onBack={() => navigate(-1)}
+            actions={
+              <PermissionGuard permission="workorder.recap.export">
+                <Button
+                  id="btn_ExportRecapWoPdf"
+                  type="button"
+                  variant="secondary"
+                  onClick={handleExportPdf}
+                  disabled={isLoading || isExporting || !plan}
+                >
+                  <Download size={14} />
+                  {isExporting ? "Exporting..." : "Export PDF"}
+                </Button>
+              </PermissionGuard>
+            }
+          />
           <div className="relative flex items-end px-2 md:px-4 overflow-x-auto scrollbar-hide">
             <button
               id="btn_TabPlan"

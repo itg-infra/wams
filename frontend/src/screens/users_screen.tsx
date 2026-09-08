@@ -18,12 +18,13 @@ import { Button } from "../components/ui/button";
 const roleNameOf = (user: User) => (user.roles?.length > 0 ? user.roles[0].displayName : "");
 
 function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => void }) {
-    const { isUpdating, updateError, updateUser } = useUserStore();
+    const { isUpdating, updateError, updateUser, resetUserPassword } = useUserStore();
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [form, setForm] = useState<UpdateUserPayload>({
         fullname: user?.fullname ?? "",
         email: user?.email ?? "",
         employeeId: user?.employeeId ?? "",
-        password: "",
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,9 +35,14 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
     const handleSubmit = async () => {
         if (!user) return;
         const payload: UpdateUserPayload = { ...form };
-        if (!payload.password) delete payload.password;
         const ok = await updateUser(user.id, payload);
-        if (ok) onClose();
+        if (!ok) return;
+        if (newPassword) {
+            if (newPassword.length < 8 || newPassword !== confirmPassword) return;
+            const passwordOk = await resetUserPassword(user.id, newPassword);
+            if (!passwordOk) return;
+        }
+        onClose();
     };
 
     if (!user) return null;
@@ -61,22 +67,21 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</label>
-                        <input id="txt_EditEmail" name="email" type="email" value={form.email ?? ""} onChange={handleChange}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />
-                    </div>
-                    <div className="flex flex-col gap-1">
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee ID</label>
                         <input id="txt_EditEmployeeId" name="employeeId" type="text" value={form.employeeId ?? ""} onChange={handleChange}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            New Password <span className="normal-case font-normal text-gray-400">(optional)</span>
-                        </label>
-                        <input id="txt_EditPassword" name="password" type="password" value={form.password ?? ""} onChange={handleChange}
-                            placeholder="Leave empty to keep current password"
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</label>
+                        <input id="txt_EditEmail" name="email" type="email" value={form.email ?? ""} onChange={handleChange}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reset password <span className="normal-case font-normal text-gray-400">(optional, signs user out everywhere)</span></label>
+                        <input id="txt_ResetPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters"
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />
+                        {newPassword && <input id="txt_ResetPasswordConfirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password"
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-sm outline-none transition" />}
                     </div>
                 </div>
                 <div className="flex gap-3 px-6 py-4 border-t">

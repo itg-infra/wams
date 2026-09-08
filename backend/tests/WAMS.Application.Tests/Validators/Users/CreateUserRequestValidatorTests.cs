@@ -24,9 +24,14 @@ public class CreateUserRequestValidatorTests
         long? primaryWarehouseId,
         bool isValid)
     {
-        var request = new CreateUserRequest(email, password, fullname, null,
+        var request = new CreateUserRequest(
+            email, 
+            password, 
+            fullname,
             WarehouseIds: warehouseIds,
-            PrimaryWarehouseId: primaryWarehouseId);
+            PrimaryWarehouseId: primaryWarehouseId,
+            EmployeeId: "EMP-001"
+        );
 
         var result = _validator.Validate(request);
 
@@ -38,7 +43,7 @@ public class CreateUserRequestValidatorTests
     public void Validate_EmailTooLong_IsInvalid()
     {
         var longEmail = new string('a', 250) + "@b.com";
-        var request = new CreateUserRequest(longEmail, "Pass1234!", "Alice", null);
+        var request = new CreateUserRequest(longEmail, "Pass1234!", "Alice", null, EmployeeId: "EMP-001");
 
         var result = _validator.Validate(request);
 
@@ -49,11 +54,21 @@ public class CreateUserRequestValidatorTests
     [Fact]
     public void Validate_FullnameTooLong_IsInvalid()
     {
-        var request = new CreateUserRequest("a@b.com", "Pass1234!", new string('x', 101), null);
+        var request = new CreateUserRequest("a@b.com", "Pass1234!", new string('x', 101), null, EmployeeId: "EMP-001");
 
         var result = _validator.Validate(request);
 
         result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validate_EmptyEmployeeId_IsValid()
+    {
+        var request = new CreateUserRequest("a@b.com", "Pass1234!", "Alice", null, EmployeeId: null);
+
+        var result = _validator.Validate(request);
+
+        result.IsValid.Should().BeTrue();
     }
 }
 

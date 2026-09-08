@@ -25,6 +25,7 @@ export interface SuperAdminLoginPayload {
 export interface EmployeeLoginPayload {
     email: string;
     password: string;
+    companyId: number;
 }
 
 // ─── Token Data (login & refresh response sama strukturnya) ───────────────────
@@ -76,5 +77,7 @@ export interface AuthState {
     loginAsSuperAdmin: (payload: SuperAdminLoginPayload) => Promise<void>;
     loginAsEmployee: (payload: EmployeeLoginPayload) => Promise<void>;
     logout: () => Promise<void>;
+    updateProfile: (payload: { fullname?: string; email?: string; currentPassword?: string }) => Promise<void>;
+    changePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
     clearError: () => void;
 }

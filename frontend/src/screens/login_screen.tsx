@@ -103,7 +103,7 @@ useEffect(() => {
 
     const onLoginSuccess = () => {
       // pakai role dari store hasil login, bukan dari form
-      const isAdmin = useAuthStore.getState().hasRole("super_admin");
+            const isAdmin = useAuthStore.getState().hasRole("SUPER_ADMIN");
 
       if (isAdmin) {
         navigate("/dashboard");
@@ -122,7 +122,7 @@ useEffect(() => {
         (msg) => console.error(msg),
       );
     } else {
-      handleEmployeeLogin({ email, password }, onLoginSuccess, (msg) =>
+      handleEmployeeLogin({ email, password, companyId: selectedCompany.id }, onLoginSuccess, (msg) =>
         console.error(msg),
       );
     }

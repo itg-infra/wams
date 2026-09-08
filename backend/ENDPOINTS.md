@@ -74,7 +74,7 @@ This document provides a comprehensive reference for all API endpoints in the Wa
 | Status | Error Code | When |
 |--------|------------|------|
 | `400 Bad Request` | - | Malformed request body (JSON parse failure, model binding) - returned by ASP.NET Core before reaching application code |
-| `401 Unauthorized` | `UNAUTHORIZED` | Missing/expired/blacklisted token, or missing `sub` claim |
+| `401 Unauthorized` | `UNAUTHORIZED` | Missing/expired/blacklisted token, missing or invalid session claims, inactive account, or session version mismatch |
 | `403 Forbidden` | `FORBIDDEN` | Authenticated but lacking the required permission |
 | `404 Not Found` | `NOT_FOUND` | Requested resource does not exist |
 | `409 Conflict` | `CONFLICT` | Duplicate or constraint violation (e.g. email already in use) |
@@ -225,7 +225,7 @@ Per-endpoint breakdown of every `GET` list endpoint's searchable and sortable fi
 | Endpoint | Search fields | Sortable fields |
 |---|---|---|
 | `GET /companies` | `code`, `name`, `email`, `phone` | **`name`**, `code`, `isActive`, `createdAt` |
-| `GET /users` | `email`, `fullname`, `employeeId` | `email`, `fullname`, `employeeId`, `isActive`, **`createdAt`** |
+| `GET /users` | `email`, `fullname` | `email`, `fullname`, `isActive`, **`createdAt`** |
 | `GET /roles` | `name`, `displayName`, `description` | **`name`**, `displayName`, `isSystem`, `globalAccess`, `createdAt` |
 
 ### Budget domain
@@ -366,7 +366,7 @@ Cache__RbacPermission__TtlSeconds=60
 
 Base route: `/api/v1/auth`
 
-> **Rate limiting:** `POST /login`, `POST /refresh`, and `POST /change-password` are rate-limited to **10 requests per minute per IP** (sliding window). Exceeding the limit returns `429 Too Many Requests`. Back off exponentially on `429`.
+> **Rate limiting:** `POST /login`, `POST /refresh`, `POST /change-password`, and `POST /users/{id}/password` are rate-limited to **10 requests per minute per IP** (sliding window). Exceeding the limit returns `429 Too Many Requests`. Back off exponentially on `429`.
 
 | Method | Endpoint | Auth Required | Description | Request Body | Response |
 |--------|----------|---------------|-------------|--------------|----------|
@@ -374,7 +374,8 @@ Base route: `/api/v1/auth`
 | POST | `/api/v1/auth/refresh` | No | Refresh access token using refresh token. Rate-limited: 10/min per IP. | [`RefreshRequest`](#refreshrequest) | [`LoginResponse`](#loginresponse) |
 | POST | `/api/v1/auth/logout` | Yes | Logout and invalidate tokens | [`LogoutRequest`](#logoutrequest) | Success message |
 | GET | `/api/v1/auth/me` | Yes | Get current authenticated user info | - | [`MeResponse`](#meresponse) |
-| POST | `/api/v1/auth/change-password` | Yes | Change own password. Requires current password; verified first. Revokes all refresh tokens for the account, except the caller's current session if its refresh token is included in the request. Rate-limited: 10/min per IP. | [`ChangePasswordRequest`](#changepasswordrequest-auth) | Success message |
+| PATCH | `/api/v1/auth/profile` | Yes | Update the authenticated user's full name and/or email. Changing email requires the current password; email is normalized to lowercase and must be unique. | [`UpdateProfileRequest`](#updateprofilerequest) | [`MeResponse`](#meresponse) |
+| POST | `/api/v1/auth/change-password` | Yes | Change own password. Requires current password; verified first. Revokes all refresh tokens and invalidates all previously issued access tokens for the account. Rate-limited: 10/min per IP. | [`ChangePasswordRequest`](#changepasswordrequest-auth) | Success message |
 
 ### DTOs
 
@@ -413,16 +414,27 @@ Base route: `/api/v1/auth`
 }
 ```
 
+#### UpdateProfileRequest
+```json
+{
+  "fullname": "string (optional, max 100 characters)",
+  "email": "string (optional, valid email; requires currentPassword)",
+  "currentPassword": "string (required when email is provided)"
+}
+```
+
+At least one of `fullname` or `email` must be provided. Email changes return `401` when the current password is incorrect and `409` when the email is already in use.
+
 #### ChangePasswordRequest (auth)
 ```json
 {
   "currentPassword": "string (required)",
   "newPassword": "string (required, min 8 characters)",
-  "refreshToken": "string (optional) - if provided and it matches the caller's active refresh token, that token is excluded from the post-change revocation so the current session survives"
+  "refreshToken": "string (optional, retained for request compatibility; no session is excluded from revocation)"
 }
 ```
 
-> Self-service password change. Verifies `currentPassword` against the caller's stored hash (`401` if it doesn't match), then hashes and persists `newPassword`. Always acts on the caller's own account - there is no `{id}` route param. Revokes all other refresh tokens for the account.
+> Self-service password change. Verifies `currentPassword` against the caller's stored hash (`401` if it doesn't match), then hashes and persists `newPassword`. Always acts on the caller's own account - there is no `{id}` route param. Revokes all refresh tokens and increments the account's session version, invalidating all previously issued access tokens. The optional `refreshToken` field is retained for request compatibility but no session is excluded from revocation.
 
 #### MeResponse
 ```json
@@ -487,9 +499,10 @@ All endpoints require authentication.
 | GET | `/api/v1/users` | `user.user.read` | List users with search, sorting, and pagination | Query: [datatable params](#datatable-query-parameters) | Paginated [`UserResponse`](#userresponse) |
 | GET | `/api/v1/users/{id}` | `user.user.read` | Get user by ID | - | [`UserResponse`](#userresponse) |
 | POST | `/api/v1/users` | `user.user.create` | Create a new user | [`CreateUserRequest`](#createuserrequest) | [`UserResponse`](#userresponse) |
-| PUT | `/api/v1/users/{id}` | `user.user.update` | Update user information | [`UpdateUserRequest`](#updateuserrequest) | [`UserResponse`](#userresponse) |
+| PUT | `/api/v1/users/{id}` | `user.user.update` | Update user information, including full name, email, active state, and province scope | [`UpdateUserRequest`](#updateuserrequest) | [`UserResponse`](#userresponse) |
+| PATCH | `/api/v1/users/{id}/profile` | `user.user.update` | Update a user's profile using the same request and behavior as `PUT /api/v1/users/{id}` | [`UpdateUserRequest`](#updateuserrequest) | [`UserResponse`](#userresponse) |
 | DELETE | `/api/v1/users/{id}` | `user.user.delete` | Delete user (soft delete) | - | Success message |
-| POST | `/api/v1/users/{id}/password` | `user.user.reset_password` | Admin reset of a user's password (does not require the target's current password). Revokes all of the target's refresh tokens. Rate-limited: 10/min per IP. | [`ResetPasswordRequest`](#resetpasswordrequest) | Success message |
+| POST | `/api/v1/users/{id}/password` | `user.user.reset_password` | Admin reset of a user's password (does not require the target's current password). Revokes all of the target's refresh tokens and invalidates their existing access tokens. Rate-limited: 10/min per IP. | [`ResetPasswordRequest`](#resetpasswordrequest) | Success message |
 | POST | `/api/v1/users/{id}/roles/{roleId}` | `user.role.create` | Assign role to user | - | Success message |
 | DELETE | `/api/v1/users/{id}/roles/{roleId}` | `user.role.delete` | Remove role from user | - | Success message |
 | POST | `/api/v1/users/{id}/warehouses/{warehouseId}?isPrimary={bool}` | `user.warehouse.create` | Assign warehouse to user | - | Success message |
@@ -497,9 +510,11 @@ All endpoints require authentication.
 
 > **Province scope has no dedicated endpoint.** Unlike warehouses (fine grain, managed via the `POST`/`DELETE .../warehouses/...` endpoints above), a user's province scope (coarse grain) is set through the `provinceIds` field on `POST /users` and `PUT /users/{id}`. On update, `provinceIds` fully replaces the existing set (omit = leave untouched, `[]` = clear). See [`CreateUserRequest`](#createuserrequest) / [`UpdateUserRequest`](#updateuserrequest).
 
-**Search fields:** `email`, `fullname`, `employeeId`
+> **Super Admin safeguards:** All mutations that target an existing user, including user updates, profile updates, password resets, deletes, role/warehouse assignments and removals, permission overrides, and company assignment, enforce target-account protection. Only a Super Admin can modify an account that has the `SUPER_ADMIN` role or grant that role. Deactivation, deletion, or removal of a `SUPER_ADMIN` role is rejected if it would leave no active Super Admin accounts (`409 Conflict`). These safeguards can return `403 Forbidden` for unauthorized target mutations.
 
-**Sortable fields:** `email`, `fullname`, `employeeId`, `isActive`, `createdAt` (default)
+**Search fields:** `email`, `fullname`
+
+**Sortable fields:** `email`, `fullname`, `isActive`, `createdAt` (default)
 
 **Example:** `GET /api/v1/users?search=john&sortBy=email&sortOrder=asc&page=1&limit=20`
 
@@ -521,7 +536,6 @@ All endpoints require authentication.
   "email": "string (required, unique)",
   "password": "string (required)",
   "fullname": "string (required)",
-  "employeeId": "string (optional)",
   "warehouseIds": "long[] (optional) - List of warehouse IDs to assign (fine grain: each pins that one warehouse)",
   "primaryWarehouseId": "long (optional) - Must be present in warehouseIds",
   "provinceIds": "long[] (optional) - Province scope (coarse grain: grants every warehouse in each province). Independent of and additive with warehouseIds. 404 if any province ID doesn't exist."
@@ -534,7 +548,7 @@ All endpoints require authentication.
 ```json
 {
   "fullname": "string (optional)",
-  "employeeId": "string (optional)",
+  "email": "string (optional, valid and unique)",
   "isActive": "boolean (optional)",
   "provinceIds": "long[] (optional) - Replaces the user's province scope. Omit/null = leave scope untouched; [] = clear all provinces; [ids] = replace with this set. 404 if any province ID doesn't exist."
 }
@@ -553,7 +567,6 @@ All endpoints require authentication.
   "id": "long",
   "email": "string",
   "fullname": "string",
-  "employeeId": "string",
   "isActive": "boolean",
   "createdAt": "datetime",
   "roles": [
@@ -1377,6 +1390,8 @@ Authorization: Bearer {access_token}
 ```
 
 Access tokens expire after **15 minutes** (`expiresIn: 900`). Refresh tokens are valid for **7 days**. Use the refresh token endpoint to obtain a new access token without re-authenticating. Re-call `GET /api/v1/auth/me` after each refresh to keep the frontend permission state current.
+
+Each access token includes a session version that is checked against the active user record on every request. Password changes and admin password resets increment that version and revoke all refresh tokens, so all previously issued access and refresh tokens become invalid. Tokens for deactivated users are also rejected. A profile email or full-name update does not invalidate the current session.
 
 ---
 
@@ -4932,6 +4947,7 @@ GET /api/v1/audit-logs/record/budget_plans/42?page=1&limit=50
 | Create user | `users` | `CREATE` | new user ID | - | null | full record |
 | Update user / deactivate | `users` | `UPDATE` | user ID | - | full record before | full record after |
 | Soft-delete user | `users` | `DELETE` | user ID | - | full record before | null |
+| Update own profile (`PATCH /auth/profile`) | `users` | `UPDATE_PROFILE` or `CHANGE_EMAIL` | user ID | - | null | null |
 | Change own password (`POST /auth/change-password`) | `users` | `CHANGE_PASSWORD` | user ID | - | null | null |
 | Admin reset password (`POST /users/{id}/password`) | `users` | `RESET_PASSWORD` | target user ID | - | null | null |
 | Assign role to user | `user_roles` | `CREATE` | null | `{"UserId":N,"RoleId":M}` | null | junction fields |
@@ -5180,7 +5196,7 @@ Columns are fixed per resource. Date fields use `yyyy-MM-dd`, timestamps use `yy
 | Recap Work Orders | Budget Plan, Template Code, Warehouse, Warehouse Code, Is RFBA, BL Numbers, Activity Types, PIC Names, Status, Doc Date, Remark, Created At |
 | Transport Orders | Doc No, Type, Card Code, Card Name, Vehicle No, Vehicle Type, BL No, Item Code, Item Name, Quantity, UoM, Warehouse Code, Warehouse Name, Status |
 | SPK | Doc No, Type, Base Doc, Base Doc No, Card Code, Card Name, Item Code, Item Name, Quantity, Delivery Qty, UoM, Pack Type, Warehouse Code, Warehouse Name, BL No, Status |
-| Users | Email, Full Name, Employee ID, Active, Roles, Warehouses, Created At |
+| Users | Email, Full Name, Active, Roles, Warehouses, Created At |
 | Roles | Name, Display Name, Description, System Role, Global Access, Permission Count, Created At |
 | Companies | Code, Name, Address, Phone, Email, Active, Users, Warehouses, Created At |
 | Warehouses | Code, Name, Location, Active, First Seen At, Synced At |

@@ -180,6 +180,19 @@ export const useAuthStore = create<AuthState>()(
                     }
                 },
 
+                updateProfile: async (payload) => {
+                    const response = await authService.updateProfile(payload);
+                    if (!response.success || !response.data) throw new Error(response.message);
+                    set({ user: response.data });
+                },
+
+                changePassword: async (payload) => {
+                    const response = await authService.changePassword(payload);
+                    if (!response.success) throw new Error(response.message);
+                    clearTokens();
+                    set({ user: null, tokens: null, isAuthenticated: false });
+                },
+
                 clearError: () => set({ error: null, errorCode: null }),
             }),
             {

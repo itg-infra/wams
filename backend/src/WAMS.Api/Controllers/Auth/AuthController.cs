@@ -16,11 +16,14 @@ using WAMS.Domain.Constants;
 public class AuthController(
     IAuthService authService,
     IValidator<LoginRequest> loginValidator,
-    IValidator<ChangePasswordRequest> changePasswordValidator) : BaseController
+    IValidator<ChangePasswordRequest> changePasswordValidator,
+    IValidator<UpdateProfileRequest>? updateProfileValidator = null) : BaseController
 {
     private readonly IAuthService _authService = authService;
     private readonly IValidator<LoginRequest> _loginValidator = loginValidator;
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator = changePasswordValidator;
+    private readonly IValidator<UpdateProfileRequest> _updateProfileValidator =
+        updateProfileValidator ?? new WAMS.Application.Validators.Auth.UpdateProfileRequestValidator();
 
     /// <summary>
     /// Authenticate user and receive access + refresh tokens
@@ -104,6 +107,24 @@ public class AuthController(
             result,
             SuccessMessages.User.Retrieved
         ));
+    }
+
+    [HttpPatch("profile")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<MeResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var validation = await _updateProfileValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+        {
+            var errors = validation.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            throw new Domain.Exceptions.ValidationException(errors);
+        }
+
+        var result = await _authService.UpdateProfileAsync(GetUserId(), request);
+        return Ok(OkResponse(result, SuccessMessages.User.Updated));
     }
 
     /// <summary>

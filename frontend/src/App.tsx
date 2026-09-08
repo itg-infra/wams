@@ -46,6 +46,7 @@ import ListSettlementReport from "./screens/listSettlementReport";
 import AddUserScreen from "./screens/add_users_screen";
 import AddRoleScreen from "./screens/add_role_screen";
 import { DetailApScreen } from "./screens/detailApScreen";
+import ProfileScreen from "./screens/profile_screen";
 
 export default function App() {
   return (
@@ -69,6 +70,7 @@ export default function App() {
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomeDashboardScreen />}>
+            <Route path="profile" element={<ProfileScreen />} />
             <Route
               element={<RequirePermission permission="report.dashboard.read" />}
             >

@@ -134,13 +134,18 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(long id, [FromBody] UpdateUserRequest request)
     {
-        var result = await _userService.UpdateAsync(id, request);
+        var result = await _userService.UpdateAsync(id, request, GetUserId());
 
         return Ok(OkResponse(
             result,
             SuccessMessages.User.Updated
         ));
     }
+
+    [HttpPatch("{id:long}/profile")]
+    [RequirePermission(Permissions.User.Update)]
+    public async Task<IActionResult> UpdateProfile(long id, [FromBody] UpdateUserRequest request)
+        => await Update(id, request);
 
     /// <summary>
     /// Delete user (soft delete)
@@ -151,7 +156,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(long id)
     {
-        await _userService.DeleteAsync(id);
+        await _userService.DeleteAsync(id, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.Deleted));
     }
@@ -192,7 +197,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignRole(long id, long roleId)
     {
-        await _userService.AssignRoleAsync(id, new AssignRoleRequest(roleId));
+        await _userService.AssignRoleAsync(id, new AssignRoleRequest(roleId), GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.RoleAssigned));
     }
@@ -206,7 +211,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveRole(long id, long roleId)
     {
-        await _userService.RemoveRoleAsync(id, roleId);
+        await _userService.RemoveRoleAsync(id, roleId, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.RoleRemoved));
     }
@@ -220,7 +225,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignWarehouse(long id, long warehouseId, [FromBody] AssignWarehouseRequest? body = null)
     {
-        await _userService.AssignWarehouseAsync(id, new AssignWarehouseRequest(warehouseId, body?.IsPrimary ?? false));
+        await _userService.AssignWarehouseAsync(id, new AssignWarehouseRequest(warehouseId, body?.IsPrimary ?? false), GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.WarehouseAssigned));
     }
@@ -234,7 +239,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveWarehouse(long id, long warehouseId)
     {
-        await _userService.RemoveWarehouseAsync(id, warehouseId);
+        await _userService.RemoveWarehouseAsync(id, warehouseId, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.WarehouseRemoved));
     }
@@ -265,6 +270,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GrantPermission(long id, long permissionId, [FromBody] UserPermissionOverrideRequest request)
     {
+        await _userService.EnsureCanMutateAsync(GetUserId(), id);
         await _rbacService.GrantUserPermissionAsync(id, permissionId, request, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.PermissionGranted));
@@ -279,6 +285,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DenyPermission(long id, long permissionId, [FromBody] UserPermissionOverrideRequest request)
     {
+        await _userService.EnsureCanMutateAsync(GetUserId(), id);
         await _rbacService.DenyUserPermissionAsync(id, permissionId, request, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.PermissionDenied));
@@ -292,6 +299,7 @@ public class UsersController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> RemovePermissionOverride(long id, long permissionId)
     {
+        await _userService.EnsureCanMutateAsync(GetUserId(), id);
         await _rbacService.RemoveUserPermissionAsync(id, permissionId);
 
         return Ok(OkResponse(SuccessMessages.User.PermissionOverrideRemoved));

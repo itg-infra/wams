@@ -208,14 +208,8 @@ public class AuthService : IAuthService
         await _userRepo.UpdateAsync(user, ct);
         await _uow.CommitAsync(ct);
 
-        long? exceptTokenId = null;
-        if (!string.IsNullOrEmpty(request.RefreshToken))
-        {
-            var currentToken = await _authRepo.GetRefreshTokenByHashAsync(HashToken(request.RefreshToken), ct);
-            exceptTokenId = currentToken?.Id;
-        }
-
-        await _authRepo.RevokeAllUserTokensAsync(userId, exceptTokenId, ct);
+        await _userRepo.IncrementSessionVersionAsync(userId, ct);
+        await _authRepo.RevokeAllUserTokensAsync(userId, exceptTokenId: null, ct);
 
         await _auditLogWriter.LogAsync(
             action: "CHANGE_PASSWORD",
@@ -227,6 +221,47 @@ public class AuthService : IAuthService
             companyId: user.CompanyId,
             ct: ct
         );
+    }
+
+    public async Task<MeResponse> UpdateProfileAsync(
+        long userId,
+        UpdateProfileRequest request,
+        CancellationToken ct = default)
+    {
+        var user = await _userRepo.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException(ErrorMessages.User.NotFound(userId));
+
+        if (request.Email is not null)
+        {
+            if (!_passwordHasher.Verify(request.CurrentPassword ?? string.Empty, user.PasswordHash))
+                throw new UnauthorizedException(ErrorMessages.Auth.InvalidCredentials);
+
+            var email = request.Email.Trim().ToLowerInvariant();
+            var existing = await _userRepo.GetByEmailAsync(email, ct);
+            if (existing is not null && existing.Id != userId)
+                throw new ConflictException(ErrorMessages.User.EmailConflict(email));
+
+            user.Email = email;
+        }
+
+        if (request.Fullname is not null)
+            user.Fullname = request.Fullname;
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepo.UpdateAsync(user, ct);
+        await _uow.CommitAsync(ct);
+
+        await _auditLogWriter.LogAsync(
+            action: request.Email is not null ? "CHANGE_EMAIL" : "UPDATE_PROFILE",
+            tableName: "users",
+            recordId: user.Id,
+            userId: user.Id,
+            userEmail: user.Email,
+            userFullname: user.Fullname,
+            companyId: user.CompanyId,
+            ct: ct);
+
+        return await GetCurrentUserAsync(userId, ct);
     }
 
     public async Task<MeResponse> GetCurrentUserAsync(long userId, CancellationToken ct = default)
@@ -277,7 +312,8 @@ public class AuthService : IAuthService
             permissionMap,
             warehouses,
             provinces,
-            user.CreatedAt
+            user.CreatedAt,
+            user.EmployeeId
         );
     }
 

@@ -21,6 +21,9 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
             .NotEmpty().WithMessage(ErrorMessages.Validation.User.FullnameRequired)
             .MaximumLength(100);
 
+        RuleFor(x => x.EmployeeId)
+            .MaximumLength(50);
+
         When(x => x.WarehouseIds != null, () =>
         {
             RuleFor(x => x.WarehouseIds!)

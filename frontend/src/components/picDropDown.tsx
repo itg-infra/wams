@@ -108,11 +108,6 @@
 //                   }`}
 //                 >
 //                   <span>{user.fullname}</span>
-//                   {user.employeeId && (
-//                     <span className="ml-2 text-[12px] text-[#9CA3AF]">
-//                       #{user.employeeId}
-//                     </span>
-//                   )}
 //                 </li>
 //               ))
 //             )}
@@ -242,7 +237,6 @@ export function PICDropdown({
                   }`}
                 >
                   <span>{user.fullname}</span>
-                  {/* Bagian employeeId saya hapus karena di JSON API PIC tidak ada field employeeId */}
                 </li>
               ))
             )}

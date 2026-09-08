@@ -8,5 +8,6 @@ public interface IAuthService
     Task<LoginResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default);
     Task LogoutAsync(long userId, string jti, string refreshToken, CancellationToken ct = default);
     Task<MeResponse> GetCurrentUserAsync(long userId, CancellationToken ct = default);
+    Task<MeResponse> UpdateProfileAsync(long userId, UpdateProfileRequest request, CancellationToken ct = default);
     Task ChangePasswordAsync(long userId, ChangePasswordRequest request, CancellationToken ct = default);
 }

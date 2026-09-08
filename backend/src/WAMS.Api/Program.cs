@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -17,9 +18,11 @@ using WAMS.Application;
 using WAMS.Application.Common;
 using WAMS.Application.Export;
 using WAMS.Application.Interfaces.Common;
+using WAMS.Application.Interfaces.Users;
 using WAMS.Infrastructure;
 using WAMS.Infrastructure.Caching.Common;
 using WAMS.Infrastructure.Data;
+using WAMS.Api.Security;
 using WAMS.Infrastructure.Observability;
 
 // Serilog Bootstrap
@@ -131,6 +134,21 @@ try
                     }
 
                     return Task.CompletedTask;
+                },
+                OnTokenValidated = async context =>
+                {
+                    var subject = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                    var versionClaim = context.Principal?.FindFirst("session_version")?.Value;
+                    if (!long.TryParse(subject, out var userId) || !SessionVersionClaim.TryParse(versionClaim, out var tokenVersion))
+                    {
+                        context.Fail("Invalid session claim");
+                        return;
+                    }
+
+                    var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                    var user = await users.GetByIdUnfilteredReadOnlyAsync(userId, context.HttpContext.RequestAborted);
+                    if (user is null || !user.IsActive || user.SessionVersion != tokenVersion)
+                        context.Fail("Session is no longer valid");
                 }
             };
         });

@@ -31,6 +31,7 @@ export default function AddUserScreen() {
     isCreating,
     createError,
     createUser,
+    assignRoleToUser,
     clearCreateError,
     clearCreatesuccess,
   } = useUserStore();
@@ -56,6 +57,7 @@ export default function AddUserScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [roleOpen, setRoleOpen] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +72,7 @@ export default function AddUserScreen() {
       Record<keyof CreateUserPayload | "confirmPassword" | "role", string>
     > = {};
     if (!form.fullname.trim()) e.fullname = "Full name is required.";
-    if (!selectedRole) e.role = "Role is required.";
+    if (selectedRoleId === null) e.role = "Role is required.";
     if (!form.email.trim()) e.email = "Email is required.";
     if (!form.password) e.password = "Password is required.";
     if (!confirmPassword) {
@@ -78,7 +80,6 @@ export default function AddUserScreen() {
     } else if (form.password !== confirmPassword) {
       e.confirmPassword = "Passwords do not match.";
     }
-    if (!form.employeeId.trim()) e.employeeId = "Employee ID is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -90,10 +91,22 @@ export default function AddUserScreen() {
 
     if (!validate()) return;
 
-    const ok = await createUser(form);
+    const createdUser = await createUser(form);
 
     // SUCCESS
-    if (ok) {
+    if (createdUser && selectedRoleId !== null) {
+      const roleAssigned = await assignRoleToUser(createdUser.id, selectedRoleId);
+
+      if (!roleAssigned) {
+        setAlert({
+          show: true,
+          type: "error",
+          title: "Role Assignment Failed",
+          message: "User was created, but the selected role could not be assigned. Please assign it from the user detail page.",
+        });
+        return;
+      }
+
       setAlert({
         show: true,
         type: "success",
@@ -104,6 +117,7 @@ export default function AddUserScreen() {
       setForm(empty);
       setConfirmPassword("");
       setSelectedRole("");
+      setSelectedRoleId(null);
 
       setTimeout(() => {
         setAlert((prev) => ({
@@ -237,6 +251,7 @@ export default function AddUserScreen() {
                         key={r.id}
                         onClick={() => {
                           setSelectedRole(r.name);
+                          setSelectedRoleId(r.id);
                           setRoleOpen(false);
                           setErrors((p) => ({ ...p, role: undefined }));
                         }}
@@ -263,18 +278,18 @@ export default function AddUserScreen() {
         {/* ── Section 2: Username / Password / Confirm Password / Email ── */}
         <div className="bg-[#eef0f8] rounded-xl border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* Username → employeeId */}
+            {/* Employee ID → employeeId */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-semibold text-gray-800">
-                Username
+                Employee ID
               </label>
               <input
                 id="txt_EmployeeId"
                 name="employeeId"
                 type="text"
-                value={form.employeeId}
+                value={form.employeeId ?? ""}
                 onChange={handleChange}
-                placeholder="e.g. Adminhwho3"
+                placeholder="e.g. EMP-001"
                 className={`w-full px-3.5 py-2.5 rounded-lg border text-sm outline-none bg-white transition ${
                   errors.employeeId
                     ? "border-red-400 focus:ring-2 focus:ring-red-100"

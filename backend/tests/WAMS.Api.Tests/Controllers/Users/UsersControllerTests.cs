@@ -45,7 +45,7 @@ public class UsersControllerTests
         ], authenticationType: "jwt"));
 
     private static UserResponse FakeUser(long id = 1) =>
-        new(id, "a@b.com", "Alice", null, true, DateTime.UtcNow, [], [], []);
+        new(id, "a@b.com", "Alice", true, DateTime.UtcNow, [], [], []);
 
     // GetAll
     [Fact]
@@ -79,7 +79,7 @@ public class UsersControllerTests
         _validator.ValidateAsync(Arg.Any<CreateUserRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ValidationResult([new ValidationFailure("Email", "Required")]));
 
-        var act = async () => await _sut.Create(new CreateUserRequest("bad", "pass", "Alice", null));
+        var act = async () => await _sut.Create(new CreateUserRequest("bad", "pass", "Alice"));
 
         await act.Should().ThrowAsync<WAMS.Domain.Exceptions.ValidationException>();
     }
@@ -90,7 +90,7 @@ public class UsersControllerTests
         _validator.ValidateAsync(Arg.Any<CreateUserRequest>(), Arg.Any<CancellationToken>()).Returns(new ValidationResult());
         _userSvc.CreateAsync(Arg.Any<CreateUserRequest>(), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(FakeUser(id: 5));
 
-        var result = await _sut.Create(new CreateUserRequest("a@b.com", "Pass1234!", "Alice", null));
+        var result = await _sut.Create(new CreateUserRequest("a@b.com", "Pass1234!", "Alice"));
 
         var created = result.Should().BeOfType<CreatedAtActionResult>().Subject;
         created.StatusCode.Should().Be(201);
@@ -103,7 +103,7 @@ public class UsersControllerTests
         var result = await _sut.Delete(1);
 
         result.Should().BeOfType<OkObjectResult>();
-        await _userSvc.Received(1).DeleteAsync(1, Arg.Any<CancellationToken>());
+        await _userSvc.Received(1).DeleteAsync(1, 1, Arg.Any<CancellationToken>());
     }
 
     // Update
@@ -148,7 +148,7 @@ public class UsersControllerTests
         var result = await _sut.AssignRole(id: 1, roleId: 5);
 
         result.Should().BeOfType<OkObjectResult>();
-        await _userSvc.Received(1).AssignRoleAsync(1, Arg.Is<AssignRoleRequest>(r => r.RoleId == 5), Arg.Any<CancellationToken>());
+        await _userSvc.Received(1).AssignRoleAsync(1, Arg.Is<AssignRoleRequest>(r => r.RoleId == 5), 1, Arg.Any<CancellationToken>());
     }
 
     // RemoveRole
@@ -158,6 +158,6 @@ public class UsersControllerTests
         var result = await _sut.RemoveRole(id: 1, roleId: 5);
 
         result.Should().BeOfType<OkObjectResult>();
-        await _userSvc.Received(1).RemoveRoleAsync(1, 5, Arg.Any<CancellationToken>());
+        await _userSvc.Received(1).RemoveRoleAsync(1, 5, 1, Arg.Any<CancellationToken>());
     }
 }

@@ -167,7 +167,7 @@ public class ExportColumnDefinitionTests
     {
         var row = new UserResponse(
             Id: 1, Email: "user@example.com", Fullname: "User",
-            EmployeeId: null, IsActive: true, CreatedAt: DateTime.UtcNow,
+            IsActive: true, CreatedAt: DateTime.UtcNow,
             Roles: [], Warehouses: [], Scopes: []);
 
         var invoking = () =>

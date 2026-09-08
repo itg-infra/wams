@@ -93,7 +93,6 @@ public class UserServiceTests
             "Carol@Example.Com", 
             "Pass1234!", 
             "Carol", 
-            null,
             WarehouseIds: [7],
             PrimaryWarehouseId: 7), 
             createdBy: 1, 
@@ -123,7 +122,6 @@ public class UserServiceTests
             "a@b.c", 
             "pw", 
             "A", 
-            EmployeeId: null,
             ProvinceIds: [2, 3]),
             createdBy: 1, 
             ct: TestContext.Current.CancellationToken);
@@ -146,7 +144,7 @@ public class UserServiceTests
             .Returns([]);
 
         var act = () => _sut.CreateAsync(
-            new CreateUserRequest("a@b.c", "pw", "A", EmployeeId: null,
+            new CreateUserRequest("a@b.c", "pw", "A",
                 ProvinceIds: [99]),
             createdBy: 1);
 
@@ -174,7 +172,6 @@ public class UserServiceTests
             "Erin@Example.Com", 
             "Pass1234!", 
             "Erin", 
-            null,
             WarehouseIds: [7, 8, 9]),
             createdBy: 1, 
             ct: TestContext.Current.CancellationToken);
@@ -199,7 +196,7 @@ public class UserServiceTests
             .Returns([(8L, 99L)]);
 
         var act = () => _sut.CreateAsync(
-            new CreateUserRequest("Dave@Example.Com", "Pass1234!", "Dave", null,
+            new CreateUserRequest("Dave@Example.Com", "Pass1234!", "Dave",
                 WarehouseIds: [8]),
             createdBy: 1);
 
@@ -353,7 +350,7 @@ public class UserServiceTests
         await _userRepo.DidNotReceive().ReplaceUserProvincesAsync(
             Arg.Any<long>(), Arg.Any<IReadOnlyCollection<long>>(), Arg.Any<CancellationToken>());
         // Validation happens before mutation: an invalid province must not leave
-        // Fullname/EmployeeId/IsActive partially applied and committed.
+        // Fullname/Email/IsActive partially applied and committed.
         await _userRepo.DidNotReceive().UpdateAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
         user.Fullname.Should().NotBe("New Name");

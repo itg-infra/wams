@@ -14,6 +14,8 @@ const AUTH_ENDPOINTS = {
     logout: "api/v1/auth/logout",
     refresh: "api/v1/auth/refresh",
     me: "api/v1/auth/me",
+    profile: "api/v1/auth/profile",
+    changePassword: "api/v1/auth/change-password",
 } as const;
 
 export const authService = {
@@ -41,6 +43,7 @@ export const authService = {
             {
                 email: payload.email,
                 password: payload.password,
+                companyId: payload.companyId,
             }
         );
         return data;
@@ -78,7 +81,14 @@ export const authService = {
 
         return data.data;
     },
-    
 
-    
+    updateProfile: async (payload: { fullname?: string; email?: string; currentPassword?: string }): Promise<ApiResponse<MeResponseData>> => {
+        const { data } = await axiosProvider.patch<ApiResponse<MeResponseData>>(AUTH_ENDPOINTS.profile, payload);
+        return data;
+    },
+
+    changePassword: async (payload: { currentPassword: string; newPassword: string }): Promise<ApiResponse<null>> => {
+        const { data } = await axiosProvider.post<ApiResponse<null>>(AUTH_ENDPOINTS.changePassword, payload);
+        return data;
+    },
 };

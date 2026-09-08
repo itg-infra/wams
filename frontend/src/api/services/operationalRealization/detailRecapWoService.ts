@@ -42,6 +42,17 @@ class RealizationRecapDetailService {
     return response.data.data;
   }
 
+  async exportPdf(id: number): Promise<Blob> {
+    const response = await axiosProvider.get(
+      `/api/v1/recap-work-orders/${id}/export`,
+      {
+        responseType: "blob",
+      },
+    );
+
+    return response.data;
+  }
+
   async approvedRecap(id: number): Promise<RealizationRecaApprovedResponse> {
     const response = await axiosProvider.post<RealizationRecaApprovedResponse>(
       `/api/v1/recap-work-orders/${id}/approve`,

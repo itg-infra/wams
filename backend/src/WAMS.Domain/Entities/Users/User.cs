@@ -15,6 +15,7 @@ public class User : BaseEntity
     public string Fullname { get; set; } = string.Empty;
     public string? EmployeeId { get; set; }
     public bool IsActive { get; set; } = true;
+    public int SessionVersion { get; set; }
     public DateTime? DeletedAt { get; set; }
     public long? CreatedBy { get; set; }
 

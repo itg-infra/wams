@@ -9,12 +9,15 @@ public interface IUserRepository
 {
     Task<User?> GetByIdAsync(long id, CancellationToken ct = default);
     Task<User?> GetByIdUnfilteredAsync(long id, CancellationToken ct = default);
+    Task<User?> GetByIdUnfilteredReadOnlyAsync(long id, CancellationToken ct = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
     Task<User?> GetByEmailWithRolesAsync(string email, CancellationToken ct = default);
     Task<(List<User> Items, int TotalCount)> GetAllAsync(DataTableQuery query, CancellationToken ct = default);
     IAsyncEnumerable<UserResponse> StreamAllAsync(DataTableQuery query, int limit, CancellationToken ct = default);
     Task<User> CreateAsync(User user, CancellationToken ct = default);
     Task UpdateAsync(User user, CancellationToken ct = default);
+    Task IncrementSessionVersionAsync(long userId, CancellationToken ct = default);
+    Task<int> CountActiveSuperAdminsAsync(CancellationToken ct = default);
     Task SoftDeleteAsync(long id, CancellationToken ct = default);
     Task<bool> ExistsAsync(long id, CancellationToken ct = default);
     Task<List<long>> GetUserWarehouseIdsAsync(long userId, CancellationToken ct = default);

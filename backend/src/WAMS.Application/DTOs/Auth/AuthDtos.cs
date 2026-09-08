@@ -15,6 +15,8 @@ public record RefreshRequest(string RefreshToken);
 
 public record LogoutRequest(string RefreshToken);
 
+public record UpdateProfileRequest(string? Fullname, string? Email, string? CurrentPassword);
+
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string? RefreshToken = null);
 
 public record MeResponse(
@@ -31,5 +33,6 @@ public record MeResponse(
     Dictionary<string, Dictionary<string, List<string>>> PermissionMap,
     List<MeWarehouseResponse> Warehouses,
     List<MeProvinceResponse> Scopes,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? EmployeeId = null
 );

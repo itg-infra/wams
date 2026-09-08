@@ -1,5 +1,15 @@
 import axiosProvider from "../../providers/axiosProvider";
-import type { UserListParams, UserListResponse, CreateUserPayload, CreateUserResponse, UpdateUserPayload, UpdateUserResponse, DeleteUserResponse, UserDetailResponse } from "../../../types/users.types";
+import type {
+    UserListParams,
+    UserListResponse,
+    CreateUserPayload,
+    CreateUserResponse,
+    UpdateUserPayload,
+    UpdateUserResponse,
+    DeleteUserResponse,
+    UserDetailResponse,
+    ResetUserPasswordResponse
+} from "../../../types/users.types";
 
 const USER_ENDPOINTS = {
     list: "api/v1/users",
@@ -43,6 +53,12 @@ export const userService = {
         const { data } = await axiosProvider.delete<DeleteUserResponse>(
             USER_ENDPOINTS.byId(id)
         );
+        return data;
+    },
+
+    resetPassword: async (id: number, newPassword: string): Promise<ResetUserPasswordResponse> => {
+        const { data } = await axiosProvider.post<ResetUserPasswordResponse>(
+            `api/v1/users/${id}/password`, { newPassword });
         return data;
     },
 

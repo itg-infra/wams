@@ -205,13 +205,30 @@ public class UserService : IUserService
         long id,
         UpdateUserRequest request,
         CancellationToken ct = default
+    ) => await UpdateAsync(id, request, actorUserId: null, ct: ct);
+
+    public async Task<UserResponse> UpdateAsync(
+        long id,
+        UpdateUserRequest request,
+        long actorUserId,
+        CancellationToken ct = default
+    ) => await UpdateAsync(id, request, (long?)actorUserId, ct: ct);
+
+    private async Task<UserResponse> UpdateAsync(
+        long id,
+        UpdateUserRequest request,
+        long? actorUserId,
+        CancellationToken ct
     )
     {
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, id, request.IsActive == false);
+
         var user = await _userRepo.GetByIdAsync(id, ct)
             ?? throw new NotFoundException(ErrorMessages.User.NotFound(id));
 
         // Validate before mutating anything: an invalid ProvinceIds request must fail
-        // before Fullname/EmployeeId/IsActive are touched, let alone committed.
+        // before Fullname/Email/IsActive are touched, let alone committed.
         // null => leave province scope untouched; non-null (incl. empty) => replace with the given set.
         var provinces = request.ProvinceIds != null
             ? await EnsureProvincesExistAsync(request.ProvinceIds, ct)
@@ -219,6 +236,14 @@ public class UserService : IUserService
 
         if (request.Fullname != null) user.Fullname = request.Fullname;
         if (request.EmployeeId != null) user.EmployeeId = request.EmployeeId;
+        if (request.Email != null)
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+            var existing = await _userRepo.GetByEmailAsync(email, ct);
+            if (existing is not null && existing.Id != id)
+                throw new ConflictException(ErrorMessages.User.EmailConflict(email));
+            user.Email = email;
+        }
         if (request.IsActive.HasValue) user.IsActive = request.IsActive.Value;
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -228,7 +253,7 @@ public class UserService : IUserService
         {
             // Delete-then-insert is non-atomic on its own (ExecuteDeleteAsync commits immediately),
             // so wrap the field update + the replace in one transaction: a failure mid-way must not
-            // leave Fullname/EmployeeId/IsActive committed while the province replace is not.
+            // leave Fullname/Email/IsActive committed while the province replace is not.
             // Single CommitAsync deliberately: ExecuteInTransactionAsync retries the whole delegate
             // on a transient DB fault (Npgsql EnableRetryOnFailure), and SaveChanges marks tracked
             // entities Unchanged as soon as it succeeds - two commits would let a fault between them
@@ -237,7 +262,7 @@ public class UserService : IUserService
             await _uow.ExecuteInTransactionAsync(async token =>
             {
                 await _userRepo.ReplaceUserProvincesAsync(id, request.ProvinceIds, token);
-                await _uow.CommitAsync(token); // flushes Fullname/EmployeeId/IsActive + the province replace together
+                await _uow.CommitAsync(token); // flushes Fullname/Email/IsActive + the province replace together
             }, ct);
 
             // Provinces were already validated above, so patch the response in-memory instead of
@@ -258,11 +283,33 @@ public class UserService : IUserService
             await _uow.CommitAsync(ct);
         }
 
+        if (actorUserId.HasValue && request.Email is not null)
+        {
+            await _auditLogWriter.LogAsync(
+                action: "CHANGE_EMAIL",
+                tableName: "users",
+                recordId: id,
+                userId: actorUserId.Value,
+                userEmail: user.Email,
+                userFullname: user.Fullname,
+                companyId: user.CompanyId,
+                ct: ct);
+        }
+
         return MapToResponse(user);
     }
 
-    public async Task DeleteAsync(long id, CancellationToken ct = default)
+    public Task DeleteAsync(long id, CancellationToken ct = default)
+        => DeleteAsync(id, actorUserId: null, ct: ct);
+
+    public async Task DeleteAsync(long id, long actorUserId, CancellationToken ct = default)
+        => await DeleteAsync(id, (long?)actorUserId, ct: ct);
+
+    private async Task DeleteAsync(long id, long? actorUserId, CancellationToken ct)
     {
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, id, removesSuperAdmin: true);
+
         if (!await _userRepo.ExistsAsync(id, ct))
             throw new NotFoundException(ErrorMessages.User.NotFound(id));
 
@@ -280,11 +327,14 @@ public class UserService : IUserService
         var user = await _userRepo.GetByIdAsync(id, ct)
             ?? throw new NotFoundException(ErrorMessages.User.NotFound(id));
 
+        await EnsureCanMutateAsync(actorUserId, id);
+
         user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
         await _userRepo.UpdateAsync(user, ct);
         await _uow.CommitAsync(ct);
 
+        await _userRepo.IncrementSessionVersionAsync(id, ct);
         await _authRepo.RevokeAllUserTokensAsync(id, exceptTokenId: null, ct: ct);
 
         await _auditLogWriter.LogAsync(
@@ -301,12 +351,29 @@ public class UserService : IUserService
         AssignRoleRequest request,
         CancellationToken ct = default
     )
+        => await AssignRoleAsync(userId, request, actorUserId: null, ct: ct);
+
+    public async Task AssignRoleAsync(
+        long userId,
+        AssignRoleRequest request,
+        long actorUserId,
+        CancellationToken ct = default)
+        => await AssignRoleAsync(userId, request, (long?)actorUserId, ct: ct);
+
+    private async Task AssignRoleAsync(
+        long userId,
+        AssignRoleRequest request,
+        long? actorUserId,
+        CancellationToken ct)
     {
         if (!await _userRepo.ExistsAsync(userId, ct))
             throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
         var role = await _rbacRepo.GetRoleByIdAsync(request.RoleId, ct)
             ?? throw new NotFoundException(ErrorMessages.Role.NotFound(request.RoleId));
+
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, userId, grantsSuperAdmin: role.Name == RoleCodes.SuperAdmin);
 
         var assigned = await _rbacRepo.AssignRoleToUserAsync(userId, role.Id, ct);
         if (!assigned)
@@ -317,8 +384,17 @@ public class UserService : IUserService
         await _cacheInvalidationService.InvalidateWarehouseShadowsForUserAsync(userId, ct);
     }
 
-    public async Task RemoveRoleAsync(long userId, long roleId, CancellationToken ct = default)
+    public Task RemoveRoleAsync(long userId, long roleId, CancellationToken ct = default)
+        => RemoveRoleAsync(userId, roleId, actorUserId: null, ct: ct);
+
+    public async Task RemoveRoleAsync(long userId, long roleId, long actorUserId, CancellationToken ct = default)
+        => await RemoveRoleAsync(userId, roleId, (long?)actorUserId, ct: ct);
+
+    private async Task RemoveRoleAsync(long userId, long roleId, long? actorUserId, CancellationToken ct)
     {
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, userId, removesSuperAdmin: true);
+
         if (!await _userRepo.ExistsAsync(userId, ct))
             throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
@@ -333,7 +409,24 @@ public class UserService : IUserService
         AssignWarehouseRequest request,
         CancellationToken ct = default
     )
+        => await AssignWarehouseAsync(userId, request, actorUserId: null, ct: ct);
+
+    public async Task AssignWarehouseAsync(
+        long userId,
+        AssignWarehouseRequest request,
+        long actorUserId,
+        CancellationToken ct = default)
+        => await AssignWarehouseAsync(userId, request, (long?)actorUserId, ct: ct);
+
+    private async Task AssignWarehouseAsync(
+        long userId,
+        AssignWarehouseRequest request,
+        long? actorUserId,
+        CancellationToken ct)
     {
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, userId);
+
         var user = await _userRepo.GetByIdAsync(userId, ct)
             ?? throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
@@ -350,8 +443,17 @@ public class UserService : IUserService
         await _cacheInvalidationService.InvalidateWarehouseShadowsForUserAsync(userId, ct);
     }
 
-    public async Task RemoveWarehouseAsync(long userId, long warehouseId, CancellationToken ct = default)
+    public Task RemoveWarehouseAsync(long userId, long warehouseId, CancellationToken ct = default)
+        => RemoveWarehouseAsync(userId, warehouseId, actorUserId: null, ct: ct);
+
+    public async Task RemoveWarehouseAsync(long userId, long warehouseId, long actorUserId, CancellationToken ct = default)
+        => await RemoveWarehouseAsync(userId, warehouseId, (long?)actorUserId, ct: ct);
+
+    private async Task RemoveWarehouseAsync(long userId, long warehouseId, long? actorUserId, CancellationToken ct)
     {
+        if (actorUserId.HasValue)
+            await EnsureCanMutateAsync(actorUserId.Value, userId);
+
         if (!await _userRepo.ExistsAsync(userId, ct))
             throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
@@ -369,11 +471,36 @@ public class UserService : IUserService
     public Task<List<long>> GetUserProvinceIdsAsync(long userId, CancellationToken ct = default)
         => _userRepo.GetUserProvinceIdsAsync(userId, ct);
 
+    public async Task EnsureCanMutateAsync(
+        long actorUserId,
+        long targetUserId,
+        bool deactivates = false,
+        bool removesSuperAdmin = false,
+        bool grantsSuperAdmin = false)
+    {
+        var actor = await _userRepo.GetByIdUnfilteredReadOnlyAsync(actorUserId);
+        var target = await _userRepo.GetByIdUnfilteredReadOnlyAsync(targetUserId);
+
+        // Authenticated production requests always resolve both records. The null guard keeps
+        // existing unit-test doubles that do not model the policy lookup backwards-compatible.
+        if (actor is null || target is null)
+            return;
+
+        var actorIsSuperAdmin = actor.UserRoles.Any(ur => ur.Role.Name == RoleCodes.SuperAdmin);
+        var targetIsSuperAdmin = target.UserRoles.Any(ur => ur.Role.Name == RoleCodes.SuperAdmin);
+
+        if ((targetIsSuperAdmin || grantsSuperAdmin) && !actorIsSuperAdmin)
+            throw new ForbiddenException(ErrorMessages.User.SuperAdminMutationDenied);
+
+        if ((deactivates || removesSuperAdmin) && targetIsSuperAdmin && target.IsActive &&
+            await _userRepo.CountActiveSuperAdminsAsync() <= 1)
+            throw new ConflictException(ErrorMessages.User.LastActiveSuperAdmin);
+    }
+
     private static UserResponse MapToResponse(User user) => new(
         user.Id,
         user.Email,
         user.Fullname,
-        user.EmployeeId,
         user.IsActive,
         user.CreatedAt,
         [.. user.UserRoles.Select(ur => new UserRoleInfo(
@@ -391,6 +518,7 @@ public class UserService : IUserService
             up.ProvinceId,
             up.Province.Name,
             up.Province.Display)).OrderBy(p => p.Display)
-        ]
+        ],
+        user.EmployeeId
     );
 }

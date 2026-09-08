@@ -213,6 +213,13 @@ export default function HomeDashboardScreen() {
                     </p>
                   </div>
                   <button
+                    id="btn_Profile"
+                    onClick={() => navigate("/profile")}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Profile
+                  </button>
+                  <button
                     id="btn_Logout"
                     onClick={handleOpenLogout}
                     className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-500 hover:bg-red-50 rounded-b-xl transition"

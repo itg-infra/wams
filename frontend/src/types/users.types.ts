@@ -69,7 +69,7 @@ export interface CreateUserPayload {
     email: string;
     password: string;
     fullname: string;
-    employeeId: string;
+    employeeId?: string;
 }
 
 export interface CreateUserResponse {
@@ -83,13 +83,20 @@ export interface UpdateUserPayload {
     email?: string;
     fullname?: string;
     employeeId?: string;
-    password?: string;
+    isActive?: boolean;
+    provinceIds?: number[];
 }
 
 export interface UpdateUserResponse {
     success: boolean;
     message?: string;
     data?: User;
+    requestId?: string;
+}
+
+export interface ResetUserPasswordResponse {
+    success: boolean;
+    message?: string;
     requestId?: string;
 }
 

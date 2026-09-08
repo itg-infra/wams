@@ -10,16 +10,18 @@ using WAMS.Application.DTOs.Companies;
 using WAMS.Application.Export;
 using WAMS.Application.Export.Definitions;
 using WAMS.Application.Interfaces.Companies;
+using WAMS.Application.Interfaces.Users;
 using WAMS.Application.Common;
 using WAMS.Domain.Constants;
 
 [ApiController]
 [Route("api/v1/companies")]
-public class CompaniesController(ICompanyService companyService, IExportService exportService, IOptions<ExportOptions> exportOptions) : BaseController
+public class CompaniesController(ICompanyService companyService, IExportService exportService, IOptions<ExportOptions> exportOptions, IUserService? userService = null) : BaseController
 {
     private readonly ICompanyService _companyService = companyService;
     private readonly IExportService _exportService = exportService;
     private readonly IOptions<ExportOptions> _exportOptions = exportOptions;
+    private readonly IUserService? _userService = userService;
 
     /// <summary>Exports companies to a file in the requested format.</summary>
     [HttpGet("export")]
@@ -137,6 +139,8 @@ public class CompaniesController(ICompanyService companyService, IExportService 
     [RequirePermission(Permissions.System.CompanyAssign)]
     public async Task<IActionResult> AssignUser(long companyId, long userId, CancellationToken ct)
     {
+        if (_userService is not null)
+            await _userService.EnsureCanMutateAsync(GetUserId(), userId);
         await _companyService.AssignUserToCompanyAsync(userId, companyId, ct);
 
         return Ok(OkResponse(SuccessMessages.Company.UserAssigned));

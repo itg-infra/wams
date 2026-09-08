@@ -4,6 +4,7 @@ export interface MeResponseData {
   id: number;
   email: string;
   fullname: string;
+  employeeId: string | null;
   isActive: boolean;
   hasGlobalAccess: boolean;
   companyId: string;
@@ -42,6 +43,7 @@ export interface User {
     companyId: string,
     email: string;
     fullname: string;
+    employeeId: string | null;
     isActive: boolean;
     hasGlobalAccess: boolean;
     roles: string[];
@@ -56,6 +58,7 @@ export const mapUser = (data: MeResponseData): User => ({
     companyId: String(data.companyId),
     email: data.email,
     fullname: data.fullname,
+    employeeId: data.employeeId,
     isActive: data.isActive,
     hasGlobalAccess: data.hasGlobalAccess,
     roles: data.roles,

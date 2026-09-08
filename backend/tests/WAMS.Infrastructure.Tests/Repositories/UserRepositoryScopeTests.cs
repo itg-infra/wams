@@ -150,4 +150,40 @@ public class UserRepositoryScopeTests
 
         whIds.Should().BeEquivalentTo(new[] { geo.whA, geo.whB, geo.whC, geo.whD });
     }
+
+    [Fact]
+    public async Task UnfilteredReadOnlyLookup_DoesNotBlockSubsequentUserUpdate()
+    {
+        var o = NewDb();
+        await using (var seedDb = Open(o))
+        {
+            seedDb.Companies.Add(new Company { Id = 1, Name = "C", Code = "C001", IsActive = true });
+            seedDb.Users.AddRange(
+                new User { Id = 20, Email = "actor@t.c", Fullname = "Actor", CompanyId = 1, IsActive = true },
+                new User { Id = 21, Email = "target@t.c", Fullname = "Before", CompanyId = 1, IsActive = true });
+            await seedDb.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var db = Open(o);
+        var repo = new UserRepository(db);
+
+        // Mirrors UserService authorization: these lookups must remain read-only.
+        (await repo.GetByIdUnfilteredReadOnlyAsync(20, TestContext.Current.CancellationToken)).Should().NotBeNull();
+        (await repo.GetByIdUnfilteredReadOnlyAsync(21, TestContext.Current.CancellationToken)).Should().NotBeNull();
+
+        // Mirrors the email-conflict check performed before a user update.
+        (await repo.GetByEmailAsync("target@t.c", TestContext.Current.CancellationToken)).Should().NotBeNull();
+
+        var target = await repo.GetByIdAsync(21, TestContext.Current.CancellationToken);
+        target.Should().NotBeNull();
+        target!.Fullname = "After";
+
+        var update = async () =>
+        {
+            await repo.UpdateAsync(target, TestContext.Current.CancellationToken);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        };
+
+        await update.Should().NotThrowAsync();
+    }
 }

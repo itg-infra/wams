@@ -60,6 +60,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.UpdatedAt).HasColumnName("updated_at");
         builder.Property(u => u.DeletedAt).HasColumnName("deleted_at");
         builder.Property(u => u.IsActive).HasColumnName("is_active");
+        builder.Property(u => u.SessionVersion).HasColumnName("session_version").HasDefaultValue(0);
         builder.Property(u => u.PasswordHash).HasColumnName("password_hash");
         builder.Property(u => u.EmployeeId).HasColumnName("employee_id");
         builder.Property(u => u.CreatedBy).HasColumnName("created_by");
