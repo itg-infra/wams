@@ -13,6 +13,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
+using WAMS.Api.Hosting;
 using WAMS.Api.Middleware;
 using WAMS.Application;
 using WAMS.Application.Common;
@@ -57,13 +58,20 @@ try
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
     builder.Host.UseSerilog();
 
-    var port = builder.Configuration["PORT"] ?? "8080";
-    builder.WebHost.UseUrls($"http://*:{port}");
+    var https = HttpsConfiguration.Read(builder.Configuration);
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.ListenAnyIP(https.Port, listen =>
+        {
+            if (https.Enabled)
+                listen.UseHttps(https.CertificatePath!, https.CertificatePassword);
+        });
+    });
 
     Log.Information("Starting WAMS API");
     Log.Information("Description: Warehouse Management System API");
     Log.Information("Environment: {Environment}", builder.Environment.EnvironmentName);
-    Log.Information("Port: {Port}", port);
+    Log.Information("Endpoint: {Scheme}://0.0.0.0:{Port}", https.Enabled ? "https" : "http", https.Port);
     Log.Information("Health Check: /health");
 
     // Database

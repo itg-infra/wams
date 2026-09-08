@@ -56,6 +56,21 @@ Jwt__Secret=SECRET_JWT
 InitialAdmin__Password=PASSWORD_ADMIN
 ```
 
+### HTTPS langsung pada port 8121
+
+Jika certificate dari client berupa PFX, tambahkan ke `backend\.env`:
+
+```env
+PORT=8121
+HTTPS=true
+HTTPS_CERT_PATH=C:/WAMS/certificates/wams.pfx
+HTTPS_CERT_PASSWORD=PASSWORD_PFX
+CORS__Origins=https://DOMAIN_CLIENT:8120
+```
+
+`run.ps1` memuat nilai tersebut sebelum menjalankan backend. Jika `HTTPS=false`,
+backend tetap menggunakan HTTP seperti sebelumnya.
+
 ## Menjalankan Backend
 
 1. Buka PowerShell.
@@ -105,6 +120,23 @@ VITE_API_URL=http://localhost:8080/
 VITE_API_URL_TEST=http://localhost:8080/
 VITE_WAMS_API_URL=http://localhost:8080/
 ```
+
+Untuk menjalankan frontend melalui HTTPS pada port 8120 menggunakan PFX yang
+sama, gunakan:
+
+```env
+FRONTEND_PORT=8120
+HTTPS=true
+HTTPS_CERT_PATH=C:/WAMS/certificates/wams.pfx
+HTTPS_CERT_PASSWORD=PASSWORD_PFX
+VITE_API_URL=https://DOMAIN_CLIENT:8121/
+VITE_API_URL_TEST=https://DOMAIN_CLIENT:8121/
+VITE_WAMS_API_URL=https://DOMAIN_CLIENT:8121/
+```
+
+Hostname pada URL harus tercantum pada SAN certificate. Windows Firewall juga
+harus mengizinkan TCP port 8120 dan 8121. Jangan commit file PFX, `.env`, atau
+password certificate.
 
 `VITE_API_URL` dibaca saat proses build. Jika nilainya diubah, frontend harus
 dibuild ulang.
