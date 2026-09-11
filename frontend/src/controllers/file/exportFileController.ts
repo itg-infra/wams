@@ -1,6 +1,9 @@
 import { useExportFileStore } from "../../store/exportFileStore";
 
 export const useExportFileController = () => {
+  const exportRecapWoDetails = useExportFileStore(
+    (state) => state.exportRecapWoDetails,
+  );
   const isExporting = useExportFileStore((state) => state.isExporting);
 
   const exportRca = useExportFileStore(
@@ -66,6 +69,7 @@ export const useExportFileController = () => {
   const exportRateCards = useExportFileStore((state) => state.exportRateCards);
 
   return {
+    exportRecapWoDetails,
     isExporting,
 
     exportRca,

@@ -102,6 +102,15 @@ export const exportFileServices = {
     return response.data;
   },
 
+  exportRecapWoDetails: async (recapId: number): Promise<Blob> => {
+    const response = await axiosProvider.get(
+      `/api/v1/recap-work-orders/${recapId}/export`,
+      { responseType: "blob" },
+    );
+
+    return response.data;
+  },
+
   exportRecapWorkOrders: async (
     params: ExportBudgetTemplateParams,
   ): Promise<Blob> => {

@@ -693,6 +693,80 @@ export default function FormEditWoScreen() {
               </div>
             )}
 
+            {currentConfig.layout === "others" && (
+              <div className="space-y-4">
+                {rows.map((row, idx) => {
+                  const radioFields = currentFields.filter(
+                    (field) => field.variant === "radio",
+                  );
+                  const toolsFields = currentFields.filter(
+                    (field) => field.group === "tools",
+                  );
+                  const plainFields = currentFields.filter(
+                    (field) =>
+                      field.variant !== "radio" && field.group !== "tools",
+                  );
+
+                  return (
+                    <div
+                      key={row.id}
+                      className={idx > 0 ? "pt-4 border-t border-[#c3c9d1]" : ""}
+                    >
+                      <div className="flex flex-wrap gap-8 mb-4">
+                        {radioFields.map((field) => (
+                          <label
+                            key={field.key}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <input
+                              type="radio"
+                              checked={Boolean(row[field.key])}
+                              onChange={() =>
+                                handleRowChange(
+                                  row.id,
+                                  field.key,
+                                  !row[field.key],
+                                )
+                              }
+                              className="w-4 h-4 accent-[#3f2b96] cursor-pointer"
+                            />
+                            <span className="text-[13px] font-semibold text-[#2f2f2f]">
+                              {field.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          {plainFields.map((field) => (
+                            <div key={field.key}>
+                              <label className="block text-[12px] font-semibold text-[#2f2f2f] mb-1">
+                                {field.label}
+                              </label>
+                              {renderDynamicField(row, field)}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {toolsFields.map((field) => (
+                            <label
+                              key={field.key}
+                              className="flex items-center gap-2 text-[12px] font-medium text-[#2f2f2f]"
+                            >
+                              {renderDynamicField(row, field)}
+                              {field.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* ================= CHECKLIST LAYOUT ================= */}
             {currentConfig.layout === "checklist" && (
               <div className="space-y-4">

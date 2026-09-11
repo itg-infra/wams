@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  File,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -45,7 +46,19 @@ export default function RecapWoScreen() {
     handleSortChange,
   } = useRecapWorkOrderController();
 
-  const { exportRecapWorkOrders, isExporting } = useExportFileController();
+  const {
+    exportRecapWorkOrders,
+    isExporting,
+    exportRecapWoDetails,
+  } = useExportFileController();
+
+  const handlePrint = async (id: number) => {
+    try {
+      await exportRecapWoDetails(id);
+    } catch (error) {
+      console.error("Failed to export recap work order details:", error);
+    }
+  };
 
   const navigate = useNavigate();
 
@@ -190,6 +203,15 @@ export default function RecapWoScreen() {
                             "
           >
             <Trash2 size={15} />
+          </button>
+
+          <button
+            id="icn_PrintRecapWo"
+            type="button"
+            onClick={() => handlePrint(item.id)}
+            className="text-[#7c7c88] transition-all hover:text-[#ef4444]"
+          >
+            <File size={15} />
           </button>
         </div>
       ),

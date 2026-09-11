@@ -6,6 +6,7 @@ import {
 } from "../api/services/file/exportService";
 
 interface ExportFileStore {
+  exportRecapWoDetails: (recapId: number) => Promise<void>;
   isExporting: boolean;
 
   exportBudgetTemplates: (params: ExportParams) => Promise<void>;
@@ -30,6 +31,22 @@ interface ExportFileStore {
 }
 
 export const useExportFileStore = create<ExportFileStore>((set) => ({
+  exportRecapWoDetails: async (recapId: number) => {
+    try {
+      set({ isExporting: true });
+      const file = await exportFileServices.exportRecapWoDetails(recapId);
+      const url = window.URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `recap-wo-details-${recapId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      set({ isExporting: false });
+    }
+  },
   isExporting: false,
 
   exportRCA: async (params: ExportRCAParams) => {

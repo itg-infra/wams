@@ -1,8 +1,14 @@
 import type { WorkOrderRow } from "./workOrderRowConfig";
 
-export type FieldType = "text" | "number" | "boolean";
+export type FieldType = "text" | "number" | "boolean" | "select";
 
-export type LayoutType = "table" | "grid" | "inline" | "checklist" | "others";
+export type LayoutType =
+  | "table"
+  | "grid"
+  | "inline"
+  | "checklist"
+  | "others"
+  | "qc";
 
 export type FieldConfig = {
   label: string;
@@ -17,6 +23,7 @@ export type FieldConfig = {
   variant?: "radio" | "checkbox"; // gaya toggle untuk boolean
   group?: "tools"; // untuk mengelompokkan ke section "Tools"
   unit?: string; // suffix unit di sebelah input, mis. "Kg"
+  options?: { label: string; value: string }[];
 };
 
 export type ActivityConfig = {
@@ -241,16 +248,19 @@ export const ACTIVITY_CONFIG_EDIT: Record<string, ActivityConfig> = {
         label: "Moisture %",
         key: "moisturePercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Jamur %",
         key: "jamurPercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Bau %",
         key: "bauPercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Quality Status",
@@ -475,6 +485,36 @@ export const ACTIVITY_CONFIG_EDIT: Record<string, ActivityConfig> = {
 
 export const STORAGE_HANDLING_CONFIG: ActivityConfig = ACTIVITY_CONFIG_EDIT.Storage;
 
+const STORAGE_OTHER_CONFIG: ActivityConfig = {
+  layout: "others",
+  fields: STORAGE_HANDLING_CONFIG.fields.map((field) => {
+    if (
+      field.key === "hasPindahStapel" ||
+      field.key === "hasPembersihan" ||
+      field.key === "hasPerapihan"
+    ) {
+      return { ...field, variant: "radio" as const };
+    }
+
+    if (
+      field.key === "hasMask" ||
+      field.key === "hasSafetyGlasses" ||
+      field.key === "hasHandGloves" ||
+      field.key === "hasHelmet" ||
+      field.key === "hasSafetyShoes" ||
+      field.key === "hasSafetyVest"
+    ) {
+      return { ...field, group: "tools" as const };
+    }
+
+    if (field.key === "volumeWeight") {
+      return { ...field, unit: "Kg" };
+    }
+
+    return field;
+  }),
+};
+
 export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
   // ================= K.BONGKAR =================
 
@@ -691,16 +731,19 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
         label: "Moisture %",
         key: "moisturePercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Jamur %",
         key: "jamurPercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Bau %",
         key: "bauPercent",
         type: "number",
+        unit: "%",
       },
       {
         label: "Quality Status",
@@ -714,7 +757,7 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
   // ================= K.GUDANG =================
 
   "K.GUDANG": STORAGE_HANDLING_CONFIG,
-  OPNAME: STORAGE_HANDLING_CONFIG,
+  OPNAME: STORAGE_OTHER_CONFIG,
 
   // ================= Others =================
 
@@ -781,7 +824,7 @@ export const ACTIVITY_CONFIG: Record<string, ActivityConfig> = {
   //   ],
   // },
 
-  OTHERS: STORAGE_HANDLING_CONFIG,
+  OTHERS: STORAGE_OTHER_CONFIG,
 
   // ================= UNBAGGING =================
 
