@@ -112,8 +112,6 @@ public static class ErrorMessages
         public static string NotFound(long id) => $"Recap work order {id} not found";
         public const string CannotApproveOnlyPending = "Only Pending recaps can be approved";
         public const string CannotRejectOnlyPending = "Only Pending recaps can be rejected";
-        public static string CannotApproveHasDraftWorkOrders(int count) =>
-            $"Cannot approve recap: {count} work order(s) are still in Draft. All must be Submitted first.";
         public const string AccessDeniedDifferentWarehouse = "Access denied: recap belongs to a different warehouse";
     }
 

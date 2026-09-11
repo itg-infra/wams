@@ -12,6 +12,7 @@ using WAMS.Application.Interfaces.Warehouses;
 using WAMS.Application.Services.RecapWorkOrders;
 using WAMS.Domain.Entities.BudgetPlans;
 using WAMS.Domain.Entities.RecapWorkOrders;
+using WAMS.Domain.Entities.WorkOrders;
 using WAMS.Domain.Enums;
 using WAMS.Domain.Exceptions;
 using Xunit;
@@ -51,6 +52,37 @@ public class RecapWorkOrderServiceTests
                 WorkOrders = [],
             },
         };
+
+    [Fact]
+    public async Task ApproveAsync_AllowsRecapWithDraftWorkOrders()
+    {
+        var recap = BuildPendingRecap();
+        recap.BudgetPlan.WorkOrders =
+        [
+            new WorkOrder
+            {
+                Id = 20,
+                BudgetPlanId = recap.BudgetPlanId,
+                CompanyId = recap.CompanyId,
+                Status = WorkOrderStatus.Draft,
+            },
+        ];
+        _recapRepo.GetByIdWithDetailsAsync(recap.Id, Arg.Any<CancellationToken>()).Returns(recap);
+        _recapRepo.GetDetailProjectionAsync(recap.Id, "Reviewer", Arg.Any<CancellationToken>())
+            .Returns(Projection(warehouseId: 5) with
+            {
+                RecapStatus = "Approved",
+                ReviewerName = "Reviewer",
+            });
+
+        var result = await _sut.ApproveAsync(
+            recap.Id,
+            userId: 99,
+            reviewerName: "Reviewer",
+            TestContext.Current.CancellationToken);
+
+        result.RecapStatus.Should().Be("Approved");
+    }
 
     [Fact]
     public async Task RejectAsync_CascadesBudgetPlanToRejected_AndWritesAuditLogs()

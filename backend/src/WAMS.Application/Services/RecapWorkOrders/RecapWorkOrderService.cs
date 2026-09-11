@@ -65,9 +65,9 @@ public class RecapWorkOrderService(
         CancellationToken ct = default
     )
     {
-        // Write paths still need the tracked entity graph so the threshold check can reuse the
-        // existing in-memory math against bp.Items + bp.WorkOrders. The response is then served
-        // by the same projection used by GET - avoids a 2nd mapping path drifting from MapProjection.
+        // Write paths still need the tracked entity graph for authorization and status checks.
+        // The response is then served by the same projection used by GET, avoiding a second
+        // mapping path that could drift from MapProjection.
         var recap = await recapRepo.GetByIdWithDetailsAsync(id, ct)
             ?? throw new NotFoundException(ErrorMessages.RecapWorkOrder.NotFound(id));
 
@@ -75,11 +75,6 @@ public class RecapWorkOrderService(
 
         if (!recap.Status.CanBeReviewed)
             throw new ValidationException(ErrorMessages.RecapWorkOrder.CannotApproveOnlyPending);
-
-        var draftCount = recap.BudgetPlan.WorkOrders.Count(w => w.DeletedAt == null && w.Status == WorkOrderStatus.Draft);
-
-        if (draftCount > 0)
-            throw new ValidationException(ErrorMessages.RecapWorkOrder.CannotApproveHasDraftWorkOrders(draftCount));
 
         var reviewedAt = DateTime.UtcNow;
         await recapRepo.ReviewAsync(recap.Id, RecapWorkOrderStatus.Approved.Value, userId, reviewedAt, null, ct);
