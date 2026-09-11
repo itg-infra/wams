@@ -45,7 +45,9 @@ public record CompanyResponse(
 public record CompanyPublicResponse(
     long Id,
     string Code,
-    string Name
+    string Name,
+    string? LogoUrl,
+    bool HasLogo
 );
 
 /// <summary>

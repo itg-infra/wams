@@ -64,7 +64,13 @@ public sealed class CompanyService(
     {
         var companies = await _companyRepo.GetActiveAsync(code, ct);
 
-        return [.. companies.Select(c => new CompanyPublicResponse(c.Id, c.Code, c.Name))];
+        return [.. companies.Select(c => new CompanyPublicResponse(
+            c.Id,
+            c.Code,
+            c.Name,
+            c.LogoStorageKey is null ? null : $"/api/v1/companies/{c.Id}/logo",
+            c.LogoStorageKey is not null
+        ))];
     }
 
     public async Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, CancellationToken ct = default)

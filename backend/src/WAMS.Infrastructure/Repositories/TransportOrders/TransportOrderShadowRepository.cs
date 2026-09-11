@@ -18,8 +18,13 @@ public class TransportOrderShadowRepository(AppDbContext db) : ITransportOrderSh
         var query = db.TransportOrderShadows.Where(t => t.IsActive).AsQueryable();
         query = await ApplyBudgetPlanLocationFilterAsync(query, q.BudgetPlanId, ct);
 
-        var docStatus = string.IsNullOrWhiteSpace(q.DocStatus) ? "O" : q.DocStatus;
-        query = query.Where(t => t.DocStatus == docStatus);
+        // MO/default requests retain the historical open-only behavior. LO uses
+        // ERP lifecycle statuses (for example PK/PL/AC), so an omitted status
+        // means all active LO rows; an explicit status still filters exactly.
+        if (!string.IsNullOrWhiteSpace(q.DocStatus))
+            query = query.Where(t => t.DocStatus == q.DocStatus);
+        else if (!string.Equals(q.Type, "LO", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(t => t.DocStatus == "O");
 
         if (!string.IsNullOrWhiteSpace(q.DocNo))
             query = query.Where(t => t.DocNo == q.DocNo);
@@ -65,9 +70,10 @@ public class TransportOrderShadowRepository(AppDbContext db) : ITransportOrderSh
 
         query = await ApplyBudgetPlanLocationFilterAsync(query, q.BudgetPlanId, ct);
 
-        var docStatus = string.IsNullOrWhiteSpace(q.DocStatus) ? "O" : q.DocStatus;
-
-        query = query.Where(t => t.DocStatus == docStatus);
+        if (!string.IsNullOrWhiteSpace(q.DocStatus))
+            query = query.Where(t => t.DocStatus == q.DocStatus);
+        else if (!string.Equals(q.Type, "LO", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(t => t.DocStatus == "O");
 
         if (!string.IsNullOrWhiteSpace(q.DocNo))
             query = query.Where(t => t.DocNo == q.DocNo);

@@ -8,7 +8,7 @@ public record TransportOrderQuery : DataTableQuery
     public string? DocNo { get; init; }
     public string? Type { get; init; }
     public string? WhsCode { get; init; }
-    public string? DocStatus { get; init; } // O / C - defaults to O in repo
+    public string? DocStatus { get; init; } // Explicit status; defaults to O except LO, which includes all active statuses
 }
 
 public record TransportOrderShadowResponse(

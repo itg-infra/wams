@@ -20,6 +20,49 @@ namespace WAMS.Infrastructure.Tests.Repositories;
 public class TransportOrderShadowRepositoryTests
 {
     [Fact]
+    public async Task GetAllAsync_ForLoWithoutDocStatus_ReturnsAllActiveLoStatuses()
+    {
+        var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+
+        await using (var seed = new AppDbContext(options, Substitute.For<ITenantContext>()))
+        {
+            await seed.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+            var company = new Company { Code = "C1", Name = "Company", IsActive = true };
+            seed.Companies.Add(company);
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            seed.TransportOrderShadows.AddRange(
+                NewTo(company.Id, "LO-PK", "WH-1", "LO", "PK"),
+                NewTo(company.Id, "LO-PL", "WH-1", "LO", "PL"),
+                NewTo(company.Id, "MO-O", "WH-1"));
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            await using var db = new AppDbContext(options, Substitute.For<ITenantContext>());
+            var repo = new TransportOrderShadowRepository(db);
+
+            var (items, total) = await repo.GetAllAsync(
+                new TransportOrderQuery { Type = "LO" },
+                TestContext.Current.CancellationToken);
+
+            total.Should().Be(2);
+            items.Select(x => x.DocNo).Should().BeEquivalentTo("LO-PK", "LO-PL");
+
+            var streamed = new List<TransportOrderShadowResponse>();
+            await foreach (var item in repo.StreamAllAsync(
+                new TransportOrderQuery { Type = "LO" },
+                50,
+                TestContext.Current.CancellationToken))
+                streamed.Add(item);
+
+            streamed.Select(x => x.DocNo).Should().BeEquivalentTo("LO-PK", "LO-PL");
+        }
+
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
     public async Task GetAllAsync_WithBudgetPlanId_FiltersTransportOrdersToTheBudgetPlanLocation()
     {
         var connection = new SqliteConnection("Data Source=:memory:");
@@ -110,11 +153,16 @@ public class TransportOrderShadowRepositoryTests
         await connection.DisposeAsync();
     }
 
-    private static TransportOrderShadow NewTo(long companyId, string docNo, string whsCode) => new()
+    private static TransportOrderShadow NewTo(
+        long companyId,
+        string docNo,
+        string whsCode,
+        string type = "MO",
+        string docStatus = "O") => new()
     {
         CompanyId = companyId,
         DocNo = docNo,
-        Type = "MO",
+        Type = type,
         CardCode = "V1",
         CardName = "Vendor",
         VehicleNo = docNo,
@@ -125,7 +173,7 @@ public class TransportOrderShadowRepositoryTests
         UoM = "KG",
         WhsCode = whsCode,
         WhsName = whsCode,
-        DocStatus = "O",
+        DocStatus = docStatus,
         IsActive = true,
         FirstSeenAt = DateTime.UtcNow,
         SyncedAt = DateTime.UtcNow,

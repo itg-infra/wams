@@ -38,6 +38,25 @@ public class CompanyServiceTests
             _mimeDetector);
     }
 
+    [Fact]
+    public async Task GetActivePublicAsync_ReturnsLogoMetadataForEachCompany()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var cff = TestBuilders.Company(id: 2, code: "CFF");
+        cff.LogoStorageKey = "logos/2/logo.png";
+        _companyRepo.GetActiveAsync(null, ct).Returns([
+            cff,
+            TestBuilders.Company(id: 3, code: "CKS")
+        ]);
+
+        var result = await _sut.GetActivePublicAsync(ct: ct);
+
+        result[0].LogoUrl.Should().Be("/api/v1/companies/2/logo");
+        result[0].HasLogo.Should().BeTrue();
+        result[1].LogoUrl.Should().BeNull();
+        result[1].HasLogo.Should().BeFalse();
+    }
+
     // CreateAsync
     [Fact]
     public async Task CreateAsync_WithDuplicateCode_ThrowsConflictException()

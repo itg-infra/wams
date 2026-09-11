@@ -3359,7 +3359,7 @@ Transport Order shadows are synced from ERP (`GET /WAMS/LkTOMOLOPMS`, via `ToSyn
 | `docNo` | string | Exact match on DocNo - use to fetch all rows for a specific chip |
 | `type` | string | Filter by ERP doc-type code, e.g. `MO` or `LO` (see note above - not a loading/unloading filter) |
 | `whsCode` | string | Filter by warehouse code |
-| `docStatus` | string | `O` (open, default) or `C` (closed) |
+| `docStatus` | string | Exact status filter. Defaults to `O` except for `type=LO`, where omitted status returns all active LO rows (ERP statuses include `PK`, `PL`, and `AC`). |
 | `budgetPlanId` | long | Filter by the budget plan's warehouse location; useful for the Work Order TO picker |
 | `sortBy` | string | `docno`, `vehicleno` (default: `syncedat desc, docno asc`) |
 | `sortOrder` | string | `asc` or `desc` |
