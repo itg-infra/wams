@@ -743,7 +743,31 @@ Recommended test flow:
 
 ## Configuration
 
-Config is layered: `appsettings.json` provides base defaults, environment variables (loaded from `.env` via Make) override them. The `__` double-underscore in env var names maps to nested JSON keys - e.g. `Jwt__Secret` overrides `"Jwt": { "Secret": "..." }`.
+Config is layered: `appsettings.json` provides base defaults, then
+`appsettings.Production.json` is loaded in the Production environment, and
+environment variables override both. The `__` double-underscore in env var
+names maps to nested JSON keys - e.g. `Jwt__Secret` overrides
+`"Jwt": { "Secret": "..." }`.
+
+Two startup options are supported:
+
+```powershell
+# Existing dotenv launcher; run.ps1 reads backend/.env
+.\run.ps1
+
+# Standard ASP.NET Core JSON configuration; no dotenv launcher
+Copy-Item appsettings.Production.example.json src\WAMS.Api\appsettings.Production.json
+dotnet run --project src\WAMS.Api --no-launch-profile --environment Production
+```
+
+The real `src/WAMS.Api/appsettings.Production.json` is ignored by Git because
+it can contain database, JWT, email, object-storage, and certificate secrets.
+The checked-in `appsettings.Production.example.json` contains placeholders.
+The current local JSON was generated from the latest `windows.env` settings.
+
+When both JSON and environment variables are present, normal ASP.NET Core
+precedence applies: environment variables win. This keeps the existing
+`.env`/`run.ps1` deployment path compatible.
 
 See **[SETUP.md - Configuration Hierarchy](SETUP.md#configuration-hierarchy)** for the full reference including env var names, the `.env` quoting rules, and per-OS instructions.
 

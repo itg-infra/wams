@@ -54,6 +54,18 @@ Nilai penting yang harus diperiksa:
 MENJALANKAN BACKEND
 -------------------
 
+Backend mendukung dua pilihan konfigurasi. Cara .env dengan run.ps1 tetap
+tersedia tanpa perubahan. Untuk memakai JSON standar ASP.NET Core sebagai
+alternatif, jalankan:
+
+    Copy-Item appsettings.Production.example.json src\WAMS.Api\appsettings.Production.json
+    dotnet run --project src\WAMS.Api --no-launch-profile --environment Production
+
+File src\WAMS.Api\appsettings.Production.json diabaikan Git karena dapat berisi
+secret. Struktur dan pilihan konfigurasinya mengikuti windows.env terbaru.
+Jika JSON dan environment variable digunakan bersamaan, environment variable
+memiliki prioritas lebih tinggi.
+
 1. Buka PowerShell.
 2. Masuk ke folder backend:
 

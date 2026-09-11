@@ -77,6 +77,20 @@ backend tetap menggunakan HTTP seperti sebelumnya.
 
 ## Menjalankan Backend
 
+Backend mendukung dua pilihan konfigurasi. Cara lama dengan `.env` tetap
+tersedia dan `run.ps1` tidak berubah. Sebagai alternatif, salin template JSON
+standar ASP.NET Core:
+
+```powershell
+Copy-Item appsettings.Production.example.json src\WAMS.Api\appsettings.Production.json
+dotnet run --project src\WAMS.Api --no-launch-profile --environment Production
+```
+
+File `src\WAMS.Api\appsettings.Production.json` diabaikan Git karena dapat
+berisi secret. Konfigurasinya mengikuti `windows.env` terbaru. Jika environment
+variable dan JSON digunakan bersamaan, environment variable memiliki prioritas
+lebih tinggi.
+
 1. Buka PowerShell.
 2. Masuk ke folder backend:
 

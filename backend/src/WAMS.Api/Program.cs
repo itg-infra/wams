@@ -26,33 +26,28 @@ using WAMS.Infrastructure.Data;
 using WAMS.Api.Security;
 using WAMS.Infrastructure.Observability;
 
-// Serilog Bootstrap
-var minLevel = Enum.TryParse<LogEventLevel>(
-    Environment.GetEnvironmentVariable("Logging__MinLevel"), ignoreCase: true, out var parsedLevel)
-    ? parsedLevel
-    : LogEventLevel.Information;
+var builder = WebApplication.CreateBuilder(args);
 
-var writeToFile = !string.Equals(
-    Environment.GetEnvironmentVariable("Logging__WriteToFile"), "false", StringComparison.OrdinalIgnoreCase);
+// Serilog Bootstrap
+var logging = LoggingConfiguration.Read(builder.Configuration);
 
 const string logPath = "logs/wams-.log";
 const int logRetainDays = 30;
 
 var loggerConfig = new LoggerConfiguration()
-    .MinimumLevel.Is(minLevel)
+    .MinimumLevel.Is(logging.MinLevel)
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .WriteTo.Console(outputTemplate:
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}");
 
-if (writeToFile) loggerConfig.WriteTo.Async(a => a.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: logRetainDays));
+if (logging.WriteToFile) loggerConfig.WriteTo.Async(a => a.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: logRetainDays));
 
 Log.Logger = loggerConfig.CreateLogger();
 
 try
 {
-    var builder = WebApplication.CreateBuilder(args);
     // QuestPDF license is required to use the library. The community edition is free to use and does not require registration.
     // set here explicitly to avoid the warning message.
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;

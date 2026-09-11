@@ -7,6 +7,9 @@
 .env
 *.env
 
+# Local production configuration (may contain credentials)
+src/WAMS.Api/appsettings.Production.json
+
 # User-specific files
 *.rsuser
 *.suo
