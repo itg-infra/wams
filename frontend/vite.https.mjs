@@ -4,7 +4,6 @@ import { join } from 'node:path'
 export function getHttpsOptions(env) {
   if (env.HTTPS !== 'true') return undefined
   if (!env.HTTPS_CERT_PATH) throw new Error('HTTPS_CERT_PATH is required when HTTPS=true')
-  if (!env.HTTPS_CERT_PASSWORD) throw new Error('HTTPS_CERT_PASSWORD is required when HTTPS=true')
 
   const certificatePath = resolveCertificatePath(env.HTTPS_CERT_PATH)
 

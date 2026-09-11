@@ -37,18 +37,29 @@ public class HttpsConfigurationTests
     }
 
     [Fact]
-    public void Read_HttpsEnabled_RequiresCertificatePassword()
+    public void Read_HttpsEnabled_AllowsCertificateWithoutPassword()
     {
+        var certificatePath = Path.GetTempFileName() + ".pfx";
+        File.WriteAllText(certificatePath, "certificate");
+
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["HTTPS"] = "true",
-            ["HTTPS_CERT_PATH"] = "C:/WAMS/certificates/wams.pfx"
+            ["HTTPS_CERT_PATH"] = certificatePath
         });
 
-        var action = () => HttpsConfiguration.Read(configuration);
+        try
+        {
+            var result = HttpsConfiguration.Read(configuration);
 
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("HTTPS_CERT_PASSWORD is required when HTTPS=true");
+            result.Enabled.Should().BeTrue();
+            result.CertificatePath.Should().Be(certificatePath);
+            result.CertificatePassword.Should().BeNull();
+        }
+        finally
+        {
+            File.Delete(certificatePath);
+        }
     }
 
     [Fact]

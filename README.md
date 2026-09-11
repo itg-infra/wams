@@ -64,7 +64,8 @@ Jika certificate dari client berupa PFX, tambahkan ke `backend\.env`:
 PORT=8121
 HTTPS=true
 HTTPS_CERT_PATH=C:/WAMS/certificates
-HTTPS_CERT_PASSWORD=PASSWORD_PFX
+# Kosongkan jika file PFX tidak menggunakan password.
+HTTPS_CERT_PASSWORD=
 CORS__Origins=https://DOMAIN_CLIENT:8120
 ```
 
@@ -146,7 +147,8 @@ sama, gunakan:
 FRONTEND_PORT=8120
 HTTPS=true
 HTTPS_CERT_PATH=C:/WAMS/certificates
-HTTPS_CERT_PASSWORD=PASSWORD_PFX
+# Kosongkan jika file PFX tidak menggunakan password.
+HTTPS_CERT_PASSWORD=
 VITE_API_URL=https://DOMAIN_CLIENT:8121/
 VITE_API_URL_TEST=https://DOMAIN_CLIENT:8121/
 VITE_WAMS_API_URL=https://DOMAIN_CLIENT:8121/

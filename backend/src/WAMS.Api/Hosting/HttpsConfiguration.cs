@@ -20,9 +20,6 @@ public sealed record HttpsConfiguration(
 
         var certificatePassword = configuration["HTTPS_CERT_PASSWORD"];
 
-        if (string.IsNullOrWhiteSpace(certificatePassword))
-            throw new InvalidOperationException("HTTPS_CERT_PASSWORD is required when HTTPS=true");
-
         certificatePath = ResolveCertificatePath(certificatePath);
 
         return new HttpsConfiguration(true, port, certificatePath, certificatePassword);
