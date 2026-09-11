@@ -40,6 +40,17 @@ public class RecapWorkOrderPdfRendererTests
         Encoding.ASCII.GetString(bytes, 0, 4).Should().Be("%PDF");
     }
 
+    [Fact]
+    public void Render_leaves_nullable_wo_quantity_blank()
+    {
+        var recap = CompleteRecap();
+        recap.Realization.WorkOrders[0] = recap.Realization.WorkOrders[0] with { Quantity = null };
+
+        var bytes = new RecapWorkOrderPdfRenderer().Render(recap, Metadata());
+
+        Encoding.ASCII.GetString(bytes, 0, 4).Should().Be("%PDF");
+    }
+
     private static RecapWorkOrderDetailResponse CompleteRecap()
     {
         var header = new RecapBpHeaderResponse(
@@ -62,7 +73,7 @@ public class RecapWorkOrderPdfRendererTests
                 5_000),
             new RecapRealizationResponse(
                 header,
-                [new RecapWoItemResponse(7, "WO-01", "BL-01", "Foreman", false, new DateTime(2026, 9, 7), new DateTime(2026, 9, 7, 12, 0, 0), 95_000, "Submitted", "Soybean", "B 1234 CD")],
+                [new RecapWoItemResponse(7, "WO-01", "BL-01", "Foreman", false, new DateTime(2026, 9, 7), new DateTime(2026, 9, 7, 12, 0, 0), 95, 95_000, "Submitted", "Soybean", "B 1234 CD")],
                 100_000,
                 95_000,
                 5_000,

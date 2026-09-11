@@ -53,6 +53,7 @@ public record RecapWoItemResponse(
     bool IsRfba,
     DateTime? StartDate,
     DateTime? EndDate,
+    decimal? Quantity,
     decimal ActualCost,
     string WorkOrderStatus,
     string? Product,

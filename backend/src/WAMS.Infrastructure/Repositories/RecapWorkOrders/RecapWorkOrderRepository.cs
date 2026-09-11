@@ -521,6 +521,16 @@ public class RecapWorkOrderRepository(
                        LIMIT 1)                                                         AS vehicle_no,
                     w.activity_type_code                                                AS activity_type_code,
                     w.item_shadow_id                                                    AS item_shadow_id,
+                    CASE w.activity_type_code
+                        WHEN 'K.BONGKAR' THEN (SELECT SUM(quantity) FROM work_order_unloading_items WHERE work_order_id = w."Id")
+                        WHEN 'K.MUAT' THEN (SELECT SUM(quantity) FROM work_order_loading_items WHERE work_order_id = w."Id")
+                        WHEN 'K.GUDANG' THEN sd.volume_weight
+                        WHEN 'OPNAME' THEN sd.volume_weight
+                        WHEN 'OTHERS' THEN sd.volume_weight
+                        WHEN 'UNBAGGING' THEN ub.total_weight
+                        WHEN 'REBAGGING' THEN rb2.total_weight
+                        ELSE NULL
+                    END                                                                 AS actual_quantity,
                     COALESCE((SELECT SUM(nett_weight) FROM work_order_unloading_items WHERE work_order_id = w."Id"), 0) AS unloading_nett,
                     COALESCE((SELECT SUM(nett_weight) FROM work_order_loading_items   WHERE work_order_id = w."Id"), 0) AS loading_nett,
                     sd.volume_weight                                                    AS storage_volume,
@@ -559,13 +569,14 @@ public class RecapWorkOrderRepository(
                     VehicleNo: reader.IsDBNull(9) ? null : reader.GetString(9),
                     ActivityTypeCode: reader.GetString(10),
                     ItemShadowId: reader.GetInt64(11),
-                    UnloadingNettSum: reader.GetDecimal(12),
-                    LoadingNettSum: reader.GetDecimal(13),
-                    StorageVolumeWeight: reader.IsDBNull(14) ? null : reader.GetDecimal(14),
-                    HeavyEquipTotalCost: reader.IsDBNull(15) ? null : reader.GetDecimal(15),
-                    UnbaggingTotalWeight: reader.IsDBNull(16) ? null : reader.GetDecimal(16),
-                    RebaggingTotalWeight: reader.IsDBNull(17) ? null : reader.GetDecimal(17),
-                    CreatedAt: reader.GetDateTime(18)));
+                    ActualQuantity: reader.IsDBNull(12) ? null : reader.GetDecimal(12),
+                    UnloadingNettSum: reader.GetDecimal(13),
+                    LoadingNettSum: reader.GetDecimal(14),
+                    StorageVolumeWeight: reader.IsDBNull(15) ? null : reader.GetDecimal(15),
+                    HeavyEquipTotalCost: reader.IsDBNull(16) ? null : reader.GetDecimal(16),
+                    UnbaggingTotalWeight: reader.IsDBNull(17) ? null : reader.GetDecimal(17),
+                    RebaggingTotalWeight: reader.IsDBNull(18) ? null : reader.GetDecimal(18),
+                    CreatedAt: reader.GetDateTime(19)));
             }
         }
 

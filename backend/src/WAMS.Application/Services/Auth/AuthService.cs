@@ -266,7 +266,10 @@ public class AuthService : IAuthService
 
     public async Task<MeResponse> GetCurrentUserAsync(long userId, CancellationToken ct = default)
     {
-        var user = await _userRepo.GetByIdAsync(userId, ct)
+        // The authenticated user's home company can differ from the acting company for a
+        // Super Admin. The user id comes from the validated JWT, so resolve that identity
+        // outside the acting-company filter while leaving all business-data filters intact.
+        var user = await _userRepo.GetByIdUnfilteredReadOnlyAsync(userId, ct)
             ?? throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
         var permissions = await _rbacRepo.GetUserPermissionKeysAsync(userId, ct);

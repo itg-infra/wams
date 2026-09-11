@@ -96,6 +96,7 @@ public sealed record RecapDetailWoRow(
     string? VehicleNo,
     string ActivityTypeCode,
     long ItemShadowId,
+    decimal? ActualQuantity,
     decimal UnloadingNettSum,
     decimal LoadingNettSum,
     decimal? StorageVolumeWeight,

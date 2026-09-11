@@ -121,8 +121,50 @@ public class RecapWorkOrderServiceTests
         await act.Should().ThrowAsync<ForbiddenException>();
     }
 
+    [Fact]
+    public async Task GetByIdAsync_UsesNullableSavedWoQuantity_ForPdfRealizationRows()
+    {
+        var projection = Projection(warehouseId: 5) with
+        {
+            WoRows =
+            [
+                WoRow(id: 1, actualQuantity: null),
+                WoRow(id: 2, actualQuantity: 25m),
+            ],
+        };
+        _recapRepo.GetDetailProjectionAsync(1, null, Arg.Any<CancellationToken>())
+            .Returns(projection);
+
+        var result = await _sut.GetByIdAsync(1, 99, TestContext.Current.CancellationToken);
+
+        result.Realization.WorkOrders.Select(x => x.Quantity)
+            .Should().Equal(null, 25m);
+    }
+
     private static RecapDetailProjection Projection(long warehouseId) => new(
         1, 10, 1, warehouseId, "Pending", null, null, null,
         new RecapDetailHeader("BP-1", "TPL-1", "Approved", null, DateTime.UtcNow, "WH1", "Warehouse 1", null),
         [], [], []);
+
+    private static RecapDetailWoRow WoRow(long id, decimal? actualQuantity) => new(
+        Id: id,
+        Code: $"WO-{id}",
+        BlNumber: null,
+        PicName: null,
+        IsRfba: false,
+        StartDate: null,
+        EndDate: null,
+        Status: "Draft",
+        ActivityName: "Unloading",
+        VehicleNo: null,
+        ActivityTypeCode: global::WAMS.Domain.Constants.ActivityTypeCodes.Bongkar,
+        ItemShadowId: 1,
+        ActualQuantity: actualQuantity,
+        UnloadingNettSum: 0,
+        LoadingNettSum: 0,
+        StorageVolumeWeight: null,
+        HeavyEquipTotalCost: null,
+        UnbaggingTotalWeight: null,
+        RebaggingTotalWeight: null,
+        CreatedAt: DateTime.UtcNow);
 }

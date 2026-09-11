@@ -315,6 +315,7 @@ public class AuthServiceTests
     {
         var user = TestBuilders.ActiveUser(id: 1, email: "old@example.com");
         _userRepo.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(1, Arg.Any<CancellationToken>()).Returns(user);
         _userRepo.GetByEmailAsync("new@example.com", Arg.Any<CancellationToken>()).ReturnsNull();
         _hasher.Verify("oldpass1", "hashed").Returns(true);
         _rbacRepo.GetUserPermissionKeysAsync(1, Arg.Any<CancellationToken>()).Returns([]);
@@ -391,7 +392,7 @@ public class AuthServiceTests
     [Fact]
     public async Task GetCurrentUserAsync_WithUserNotFound_ThrowsNotFoundException()
     {
-        _userRepo.GetByIdAsync(99, TestContext.Current.CancellationToken).ReturnsNull();
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(99, TestContext.Current.CancellationToken).ReturnsNull();
 
         var act = () => _sut.GetCurrentUserAsync(99);
 
@@ -402,7 +403,7 @@ public class AuthServiceTests
     public async Task GetCurrentUserAsync_WithValidUser_ReturnsMeResponse()
     {
         var user = TestBuilders.ActiveUser(id: 1);
-        _userRepo.GetByIdAsync(1, TestContext.Current.CancellationToken).Returns(user);
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(1, TestContext.Current.CancellationToken).Returns(user);
         _rbacRepo.GetUserPermissionKeysAsync(1, Arg.Any<CancellationToken>()).Returns(["user.user.read"]);
 
         var result = await _sut.GetCurrentUserAsync(1, TestContext.Current.CancellationToken);
@@ -426,7 +427,7 @@ public class AuthServiceTests
                 new UserProvince { ProvinceId = 3, Province = new Province { Id = 3, Name = "LAMPUNG", Display = "Lampung" } }
             }
         };
-        _userRepo.GetByIdAsync(7, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(7, Arg.Any<CancellationToken>()).Returns(user);
         _rbacRepo.GetUserPermissionKeysAsync(7, Arg.Any<CancellationToken>()).Returns([]);
 
         var result = await _sut.GetCurrentUserAsync(7, TestContext.Current.CancellationToken);
@@ -439,7 +440,7 @@ public class AuthServiceTests
     public async Task GetCurrentUserAsync_SuperAdminActingAsDifferentCompany_ReturnsActingCompanyNotHomeCompany()
     {
         var user = TestBuilders.ActiveUser(id: 1, companyId: 1); // home company 1
-        _userRepo.GetByIdAsync(1, TestContext.Current.CancellationToken).Returns(user);
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(1, TestContext.Current.CancellationToken).Returns(user);
         _rbacRepo.GetUserPermissionKeysAsync(1, Arg.Any<CancellationToken>()).Returns([]);
         _tenantContext.CompanyId.Returns(2L); // acting as company 2
         _companyRepo.GetByIdAsync(2, Arg.Any<CancellationToken>()).Returns(TestBuilders.Company(id: 2, code: "OTHER"));

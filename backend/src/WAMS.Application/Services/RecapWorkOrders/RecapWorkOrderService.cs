@@ -246,6 +246,7 @@ public class RecapWorkOrderService(
                 w.IsRfba,
                 w.StartDate,
                 w.EndDate,
+                w.ActualQuantity,
                 ComputeActualCostFromProjection(w, costByItem),
                 w.Status,
                 w.ActivityName,

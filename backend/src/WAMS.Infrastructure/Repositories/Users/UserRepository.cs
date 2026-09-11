@@ -374,7 +374,11 @@ public class UserRepository : IUserRepository
     {
         return await _db.Users
             .IgnoreQueryFilters()
+            .Include(u => u.Company)
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
+            .Include(u => u.UserProvinces).ThenInclude(up => up.Province)
+            .AsSplitQuery()
             .AsNoTracking()
             .Where(u => u.DeletedAt == null)
             .FirstOrDefaultAsync(u => u.Id == id, ct);

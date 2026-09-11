@@ -5,6 +5,7 @@ using WAMS.Application.Interfaces.Common;
 using WAMS.Domain.Constants;
 using WAMS.Domain.Entities.Common;
 using WAMS.Domain.Entities.Companies;
+using WAMS.Domain.Entities.Roles;
 using WAMS.Domain.Entities.Users;
 using WAMS.Domain.Entities.Warehouses;
 using WAMS.Infrastructure.Data;
@@ -185,5 +186,48 @@ public class UserRepositoryScopeTests
         };
 
         await update.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task UnfilteredReadOnlyLookup_LoadsCurrentUserAcrossActingCompanyBoundary()
+    {
+        var o = NewDb();
+        await using (var seedDb = Open(o))
+        {
+            var homeCompany = new Company { Id = 1, Name = "GCU", Code = "GCU", IsActive = true };
+            var actingCompany = new Company { Id = 2, Name = "CFF", Code = "CFF", IsActive = true };
+            var role = new WAMS.Domain.Entities.Roles.Role
+            {
+                Id = 1,
+                Name = RoleCodes.SuperAdmin,
+                DisplayName = "Super Admin",
+                IsSystem = true,
+                GlobalAccess = true
+            };
+            var user = new User
+            {
+                Id = 28,
+                Email = "sa@example.com",
+                Fullname = "Super Admin",
+                CompanyId = homeCompany.Id,
+                Company = homeCompany,
+                IsActive = true
+            };
+            user.UserRoles.Add(new UserRole { User = user, Role = role });
+            seedDb.AddRange(homeCompany, actingCompany, role, user);
+            await seedDb.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var actingTenant = Substitute.For<ITenantContext>();
+        actingTenant.IsSet.Returns(true);
+        actingTenant.CompanyId.Returns(2L);
+        await using var db = new AppDbContext(o, actingTenant);
+        var repo = new UserRepository(db);
+
+        var currentUser = await repo.GetByIdUnfilteredReadOnlyAsync(28, TestContext.Current.CancellationToken);
+
+        currentUser.Should().NotBeNull();
+        currentUser!.Company.Code.Should().Be("GCU");
+        currentUser.UserRoles.Should().ContainSingle(ur => ur.Role.Name == RoleCodes.SuperAdmin);
     }
 }

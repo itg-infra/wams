@@ -247,6 +247,7 @@ public class RecapWorkOrderPdfRenderer : IRecapWorkOrderPdfRenderer
                     columns.RelativeColumn(0.6f);
                     columns.RelativeColumn(1);
                     columns.RelativeColumn(1);
+                    columns.RelativeColumn(0.7f);
                     columns.RelativeColumn(1.4f);
                     columns.RelativeColumn(1);
                     columns.RelativeColumn(1.3f);
@@ -254,11 +255,11 @@ public class RecapWorkOrderPdfRenderer : IRecapWorkOrderPdfRenderer
                 });
 
                 AddTableHeader(table,
-                    ["WO Code", "BL No", "PIC", "RFBA", "Start Date", "End Date", "Actual Cost", "Status", "Product", "Vehicle"]);
+                    ["WO Code", "BL No", "PIC", "RFBA", "Start Date", "End Date", "Qty", "Actual Cost", "Status", "Product", "Vehicle"]);
 
                 if (rows.Count == 0)
                 {
-                    AddEmptyRow(table, 10);
+                    AddEmptyRow(table, 11);
                     return;
                 }
 
@@ -270,6 +271,7 @@ public class RecapWorkOrderPdfRenderer : IRecapWorkOrderPdfRenderer
                     AddCell(table, row.IsRfba ? "Yes" : "No");
                     AddCell(table, FormatDate(row.StartDate));
                     AddCell(table, FormatDate(row.EndDate));
+                    AddCell(table, row.Quantity.HasValue ? FormatNumber(row.Quantity) : string.Empty, true);
                     AddCell(table, FormatCurrency(row.ActualCost), true);
                     AddCell(table, row.WorkOrderStatus);
                     AddCell(table, row.Product ?? "-");
