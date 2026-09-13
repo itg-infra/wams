@@ -140,6 +140,7 @@ axiosProvider.interceptors.response.use(
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("auth-storage");
+        localStorage.removeItem("WarehouseStore");
         sessionStorage.setItem("session_expired", "true"); // ← flag untuk login screen
 
         // ─── Sentry: catat kegagalan refresh token ────────────────────────

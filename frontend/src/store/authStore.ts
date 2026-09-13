@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { authService } from "../api/services/auth/authService";
+import { useWarehouseStore } from "./warehouseStore";
+import { useNotificationStore } from "../master_data/store/listNotificationStore";
 import type {
     AuthState,
     EmployeeLoginPayload,
@@ -16,6 +18,15 @@ function clearTokens() {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('auth-storage'); 
+}
+
+function clearTenantState() {
+    // Keep unrelated browser preferences intact; only reset state scoped to the session/company.
+    useWarehouseStore.getState().reset();
+    useNotificationStore.getState().reset();
+    // Resetting the persisted store writes its empty snapshot; remove that snapshot afterward.
+    useWarehouseStore.persist.clearStorage();
+    localStorage.removeItem("WarehouseStore");
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -83,6 +94,7 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         saveTokens(response.data);
+                        clearTenantState();
                         const me = await authService.getMe();
 
                         if (!me.id) {
@@ -129,6 +141,7 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         saveTokens(response.data);
+                        clearTenantState();
                         const me = await authService.getMe();
 
                         if (!me.id) {
@@ -168,6 +181,7 @@ export const useAuthStore = create<AuthState>()(
                         // (misal token sudah expired di BE)
                     } finally {
                         clearTokens();
+                        clearTenantState();
                         set({
                             user: null,
                             tokens: null,
@@ -190,6 +204,7 @@ export const useAuthStore = create<AuthState>()(
                     const response = await authService.changePassword(payload);
                     if (!response.success) throw new Error(response.message);
                     clearTokens();
+                    clearTenantState();
                     set({ user: null, tokens: null, isAuthenticated: false });
                 },
 

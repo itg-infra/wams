@@ -86,6 +86,7 @@ wamsAxiosProvider.interceptors.response.use(
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('auth-storage');
+                localStorage.removeItem('WarehouseStore');
                 sessionStorage.setItem('session_expired', 'true');
                 window.location.href = '/login';
                 return Promise.reject(error);

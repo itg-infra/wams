@@ -44,6 +44,7 @@ export interface WarehouseState {
     setSearch: (search: string) => void;
     setPage: (page: number) => void;
     clearError: () => void;
+    reset: () => void;
 }
 
 export interface FetchWarehouseParams {

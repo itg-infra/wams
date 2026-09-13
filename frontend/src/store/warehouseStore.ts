@@ -82,6 +82,17 @@ export const useWarehouseStore = create<WarehouseState>()(
                 setPage: (page) => set({ page }),
 
                 clearError: () => set({ error: null }),
+
+                reset: () => set({
+                    warehouses: [],
+                    selectedWarehouse: null,
+                    isLoading: false,
+                    error: null,
+                    meta: null,
+                    page: 1,
+                    search: "",
+                    limit: 20,
+                }),
             }),
             {
                 name: "WarehouseStore",
