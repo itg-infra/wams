@@ -42,8 +42,10 @@ export const markAllNotificationsAsRead = async (): Promise<{
 export const createNotificationStream = (
   onMessage: (notification: NotificationStreamResponse) => void,
   onError?: (error: Event) => void,
+  onConnected?: () => void,
 ) => {
   const token = localStorage.getItem("token");
+  if (!token) return null;
 
   const eventSource = new EventSourcePolyfill(
     `${import.meta.env.VITE_API_URL_TEST}api/v1/notifications/stream`,
@@ -58,6 +60,7 @@ export const createNotificationStream = (
 
   eventSource.addEventListener("connected", (event) => {
     console.log("SSE connected", event);
+    onConnected?.();
   });
 
   eventSource.addEventListener("heartbeat", () => {});
@@ -74,6 +77,7 @@ export const createNotificationStream = (
 
   eventSource.onerror = (error) => {
     onError?.(error.target);
+    eventSource.close();
   };
 
   return eventSource;

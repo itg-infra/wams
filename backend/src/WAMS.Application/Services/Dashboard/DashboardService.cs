@@ -2,6 +2,7 @@ namespace WAMS.Application.Services.Dashboard;
 
 using WAMS.Application.DTOs.Dashboard;
 using WAMS.Application.Interfaces.Dashboard;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Application.Interfaces.Rbac;
 using WAMS.Application.Interfaces.Users;
 using WAMS.Application.Interfaces.Warehouses;
@@ -10,7 +11,8 @@ public class DashboardService(
     IDashboardRepository repo,
     IWarehouseContext warehouseContext,
     IUserRepository userRepo,
-    IRbacService rbacService
+    IRbacService rbacService,
+    ITenantContext tenantContext
 ) : IDashboardService
 {
     public async Task<DashboardSummaryResponse> GetSummaryAsync(
@@ -21,7 +23,7 @@ public class DashboardService(
     {
         var warehouseIds = await ResolveWarehouseIdsAsync(userId, ct);
 
-        return await repo.GetSummaryAsync(warehouseIds, userRoleNames, ct);
+        return await repo.GetSummaryAsync(GetCompanyId(), warehouseIds, userRoleNames, ct);
     }
 
     public async Task<(List<DashboardActivityResponse> Items, int TotalCount)> GetTodayActivitiesAsync(
@@ -32,7 +34,7 @@ public class DashboardService(
     {
         var warehouseIds = await ResolveWarehouseIdsAsync(userId, ct);
 
-        return await repo.GetTodayActivitiesAsync(query, warehouseIds, ct);
+        return await repo.GetTodayActivitiesAsync(query, GetCompanyId(), warehouseIds, ct);
     }
 
     public async Task<DashboardHistoryResponse> GetHistoryAsync(
@@ -44,7 +46,7 @@ public class DashboardService(
     {
         var warehouseIds = await ResolveWarehouseIdsAsync(userId, ct);
 
-        return await repo.GetHistoryAsync(year, month, warehouseIds, ct);
+        return await repo.GetHistoryAsync(year, month, GetCompanyId(), warehouseIds, ct);
     }
 
     private async Task<IReadOnlyList<long>?> ResolveWarehouseIdsAsync(long userId, CancellationToken ct)
@@ -58,4 +60,9 @@ public class DashboardService(
 
         return null;
     }
+
+    private long GetCompanyId()
+        => tenantContext.IsSet && tenantContext.CompanyId.HasValue
+            ? tenantContext.CompanyId.Value
+            : throw new InvalidOperationException("Dashboard requests require an active company tenant.");
 }

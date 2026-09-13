@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LogOut,
   ChevronDown,
@@ -11,13 +11,15 @@ import Sidebar from "../components/sidebar/sidebar";
 import { useSidebar } from "../hook/useSideBar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCompanyStore } from "../store/companyStore";
-import { companyLogoMap, defaultLogo } from "../assets/companyLogo";
+import { resolveCompanyBranding } from "../assets/companyBranding";
 import NotificationDropdown from "../components/notificationDropDown";
 import { useNotificationController } from "../master_data/controller/listNotificationController";
 import { LogoutDialog } from "../components/logOutDialog";
 import { WarehouseSelector } from "../components/warehouseSelector";
 import PermissionGuard from "../components/guards/permissionGuard";
 import type { ListNotification } from "../types/listNotifications";
+import { useAuthStore } from "../store/authStore";
+import NotificationStream from "../components/notificaitonStream";
 
 export default function HomeDashboardScreen() {
   const {
@@ -44,16 +46,51 @@ export default function HomeDashboardScreen() {
 
   const activePage = location.pathname;
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   const handleNavigate = (path: string) => {
     navigate(path);
   };
 
+  const companies = useCompanyStore((s) => s.companies);
+  const fetchCompanies = useCompanyStore((s) => s.fetchCompanies);
   const selectedCompanyId = useCompanyStore((s) => s.selectedCompanyId);
-  const logo = companyLogoMap[selectedCompanyId ?? -1] ?? defaultLogo;
+  const user = useAuthStore((s) => s.user);
+  const authenticatedCompanyId = Number(user?.companyId);
+  const companyId = Number.isFinite(authenticatedCompanyId)
+    ? authenticatedCompanyId
+    : selectedCompanyId;
+  const companyBranding = resolveCompanyBranding(
+    companies,
+    companyId,
+    import.meta.env.VITE_API_URL,
+  );
+  const companyCode = user?.companyCode ?? companyBranding.code;
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    if (companies.length === 0) {
+      void fetchCompanies();
+    }
+  }, [companies.length, fetchCompanies]);
 
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const companyBrand = (
+    <div className="flex items-center justify-center py-2">
+      {companyBranding.logoUrl ? (
+        <img
+          src={companyBranding.logoUrl}
+          alt={`${companyCode} logo`}
+          className={`object-contain transition-all duration-300 ${
+            sidebarCollapsed ? "h-8 w-8" : "h-10 w-auto"
+          }`}
+        />
+      ) : (
+        <span className="font-bold text-indigo-700" aria-label="Company name">
+          {companyCode}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen  bg-[#F8F8F8]">
@@ -63,6 +100,7 @@ export default function HomeDashboardScreen() {
         onConfirm={handleConfirmLogout}
         onCancel={handleCancelLogout}
       />
+      <NotificationStream />
 
       {/* SIDEBAR */}
       {/* Desktop Sidebar */}
@@ -73,17 +111,7 @@ export default function HomeDashboardScreen() {
           onNavigate={handleNavigate}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
-          header={
-            <div className="flex items-center justify-center py-2">
-              <img
-                src={logo}
-                alt="Company Logo"
-                className={`object-contain transition-all duration-300 ${
-                  sidebarCollapsed ? "h-8 w-8" : "h-10 w-auto"
-                }`}
-              />
-            </div>
-          }
+          header={companyBrand}
           bottomItems={
             <button
               id="btn_SignOut"
@@ -115,15 +143,7 @@ export default function HomeDashboardScreen() {
               }}
               collapsed={false}
               onToggleCollapse={() => {}}
-              header={
-                <div className="flex items-center justify-center py-2">
-                  <img
-                    src={logo}
-                    alt="Company Logo"
-                    className="h-10 w-auto object-contain"
-                  />
-                </div>
-              }
+              header={companyBrand}
               bottomItems={
                 <button
                   id="btn_SignOutMobile"
@@ -185,7 +205,7 @@ export default function HomeDashboardScreen() {
                     notification: ListNotification,
                   ) => {
                     await handleNotificationClick(notification); 
-                    navigate(notification.route);
+                    if (notification.route) navigate(notification.route);
 
                   }}
                 />

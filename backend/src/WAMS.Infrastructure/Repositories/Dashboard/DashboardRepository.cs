@@ -12,6 +12,7 @@ using WAMS.Infrastructure.Data;
 public class DashboardRepository(AppDbContext db) : IDashboardRepository
 {
     public async Task<DashboardSummaryResponse> GetSummaryAsync(
+        long companyId,
         IReadOnlyList<long>? warehouseIds,
         IReadOnlyList<string> userRoleNames,
         CancellationToken ct = default
@@ -44,6 +45,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                     AND ap.sap_ap_number IS NOT NULL
                     AND ap.deleted_at IS NULL
                 WHERE bp.deleted_at IS NULL
+                  AND bp.company_id = @p_company_id
                   AND bp.status = 'Approved'
                   AND date_trunc('month', bp.doc_date AT TIME ZONE 'UTC') =
                       date_trunc('month', CURRENT_DATE::timestamptz AT TIME ZONE 'UTC')
@@ -57,6 +59,8 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 JOIN budget_plans bp ON bp."Id" = bpi.budget_plan_id
                 WHERE po.status = 'Generated'
                   AND po.deleted_at IS NULL
+                  AND po.company_id = @p_company_id
+                  AND bp.company_id = @p_company_id
                   AND (@p_wh_disabled OR bp.warehouse_shadow_id = ANY(@p_wh_ids))
                   AND NOT EXISTS (
                       SELECT 1
@@ -84,6 +88,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 FROM work_orders wo
                 WHERE wo.deleted_at IS NULL
                   AND wo.status = 'Submitted'
+                  AND wo.company_id = @p_company_id
                   AND (@p_wh_disabled OR wo.warehouse_shadow_id = ANY(@p_wh_ids))
             ),
             pending_docs AS (
@@ -97,6 +102,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                     AND wis.status = 'Pending'
                 WHERE bp.status = 'InApproval'
                   AND bp.deleted_at IS NULL
+                  AND bp.company_id = @p_company_id
                   AND (@p_wh_disabled OR bp.warehouse_shadow_id = ANY(@p_wh_ids))
                   AND EXISTS (
                       SELECT 1 FROM jsonb_array_elements_text(wis.approver_roles) r
@@ -108,6 +114,8 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 FROM recap_work_orders rwo
                 JOIN budget_plans bp ON bp."Id" = rwo.budget_plan_id
                 WHERE rwo.status = 'Pending'
+                  AND rwo.company_id = @p_company_id
+                  AND bp.company_id = @p_company_id
                   AND (@p_wh_disabled OR bp.warehouse_shadow_id = ANY(@p_wh_ids))
             ),
             approval_kpi AS (
@@ -132,6 +140,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
         await conn.OpenAsync(ct);
 
         await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.Add(new NpgsqlParameter("p_company_id", NpgsqlDbType.Bigint) { Value = companyId });
         cmd.Parameters.Add(new NpgsqlParameter("p_wh_disabled", NpgsqlDbType.Boolean) { Value = warehouseFilterDisabled });
         cmd.Parameters.Add(new NpgsqlParameter("p_wh_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = warehouseIdsArray });
         cmd.Parameters.Add(new NpgsqlParameter("p_role_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = roleNamesArray });
@@ -157,6 +166,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
 
     public async Task<(List<DashboardActivityResponse> Items, int TotalCount)> GetTodayActivitiesAsync(
         DashboardActivityQuery query,
+        long companyId,
         IReadOnlyList<long>? warehouseIds,
         CancellationToken ct = default
     )
@@ -185,6 +195,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 FROM budget_plans bp
                 JOIN warehouse_shadows ws ON ws."Id" = bp.warehouse_shadow_id
                 WHERE bp.deleted_at IS NULL
+                  AND bp.company_id = @p_company_id
                   AND bp.created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')::timestamptz
                   AND bp.created_at <  (date_trunc('day', NOW() AT TIME ZONE 'UTC') + interval '1 day')::timestamptz
                   AND (@p_wh_disabled OR bp.warehouse_shadow_id = ANY(@p_wh_ids))
@@ -221,6 +232,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
         await conn.OpenAsync(ct);
 
         await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.Add(new NpgsqlParameter("p_company_id", NpgsqlDbType.Bigint) { Value = companyId });
         cmd.Parameters.Add(new NpgsqlParameter("p_wh_disabled", NpgsqlDbType.Boolean) { Value = warehouseFilterDisabled });
         cmd.Parameters.Add(new NpgsqlParameter("p_wh_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = warehouseIdsArray });
         cmd.Parameters.Add(new NpgsqlParameter("p_search", NpgsqlDbType.Text) { Value = (object?)search ?? DBNull.Value });
@@ -267,6 +279,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
     public async Task<DashboardHistoryResponse> GetHistoryAsync(
         int year,
         int month,
+        long companyId,
         IReadOnlyList<long>? warehouseIds,
         CancellationToken ct = default
     )
@@ -291,6 +304,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 JOIN item_shadows item     ON item."Id" = wo.item_shadow_id
                 WHERE wo.submitted_at IS NOT NULL
                   AND wo.deleted_at IS NULL
+                  AND wo.company_id = @p_company_id
                   AND EXTRACT(YEAR  FROM wo.submitted_at AT TIME ZONE 'UTC') = @p_year
                   AND EXTRACT(MONTH FROM wo.submitted_at AT TIME ZONE 'UTC') = @p_month
                   AND (@p_wh_disabled OR wo.warehouse_shadow_id = ANY(@p_wh_ids))
@@ -312,6 +326,8 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
                 JOIN warehouse_shadows ws     ON ws."Id" = wo.warehouse_shadow_id
                 JOIN item_shadows item        ON item."Id" = wo.item_shadow_id
                 WHERE wis.status IN ('Approved', 'Rejected')
+                  AND bp.company_id = @p_company_id
+                  AND wo.company_id = @p_company_id
                   AND (
                       (wis.status = 'Approved' AND
                        EXTRACT(YEAR  FROM wis.approved_at AT TIME ZONE 'UTC') = @p_year AND
@@ -340,6 +356,7 @@ public class DashboardRepository(AppDbContext db) : IDashboardRepository
         await conn.OpenAsync(ct);
 
         await using var cmd = new NpgsqlCommand(eventsSql, conn);
+        cmd.Parameters.Add(new NpgsqlParameter("p_company_id", NpgsqlDbType.Bigint) { Value = companyId });
         cmd.Parameters.Add(new NpgsqlParameter("p_year", NpgsqlDbType.Integer) { Value = year });
         cmd.Parameters.Add(new NpgsqlParameter("p_month", NpgsqlDbType.Integer) { Value = month });
         cmd.Parameters.Add(new NpgsqlParameter("p_wh_disabled", NpgsqlDbType.Boolean) { Value = warehouseFilterDisabled });

@@ -4,6 +4,7 @@ using FluentAssertions;
 using NSubstitute;
 using WAMS.Application.DTOs.Dashboard;
 using WAMS.Application.Interfaces.Dashboard;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Application.Interfaces.Rbac;
 using WAMS.Application.Interfaces.Users;
 using WAMS.Application.Interfaces.Warehouses;
@@ -16,11 +17,14 @@ public class DashboardServiceTests
     private readonly IWarehouseContext _warehouseContext = Substitute.For<IWarehouseContext>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IRbacService _rbacService = Substitute.For<IRbacService>();
+    private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly DashboardService _sut;
 
     public DashboardServiceTests()
     {
-        _sut = new DashboardService(_repo, _warehouseContext, _userRepo, _rbacService);
+        _tenantContext.IsSet.Returns(true);
+        _tenantContext.CompanyId.Returns(17L);
+        _sut = new DashboardService(_repo, _warehouseContext, _userRepo, _rbacService, _tenantContext);
     }
 
     // --- GetSummaryAsync ---
@@ -32,6 +36,7 @@ public class DashboardServiceTests
         _warehouseContext.WarehouseId.Returns(7L);
         var expected = BuildSummary();
         _repo.GetSummaryAsync(
+                17L,
                 Arg.Is<IReadOnlyList<long>?>(ids => ids != null && ids.SequenceEqual(new long[] { 7L })),
                 Arg.Any<IReadOnlyList<string>>(),
                 Arg.Any<CancellationToken>())
@@ -50,6 +55,7 @@ public class DashboardServiceTests
         _rbacService.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
         var expected = BuildSummary();
         _repo.GetSummaryAsync(
+                17L,
                 Arg.Is<IReadOnlyList<long>?>(ids => ids == null),
                 Arg.Any<IReadOnlyList<string>>(),
                 Arg.Any<CancellationToken>())
@@ -68,6 +74,7 @@ public class DashboardServiceTests
         _userRepo.GetUserWarehouseIdsAsync(1, Arg.Any<CancellationToken>()).Returns([3L, 5L]);
         var expected = BuildSummary();
         _repo.GetSummaryAsync(
+                17L,
                 Arg.Is<IReadOnlyList<long>?>(ids => ids != null && ids.SequenceEqual(new long[] { 3L, 5L })),
                 Arg.Any<IReadOnlyList<string>>(),
                 Arg.Any<CancellationToken>())
@@ -83,14 +90,32 @@ public class DashboardServiceTests
     {
         _warehouseContext.IsSet.Returns(false);
         _rbacService.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
-        _repo.GetSummaryAsync(Arg.Any<IReadOnlyList<long>?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+        _repo.GetSummaryAsync(Arg.Any<long>(), Arg.Any<IReadOnlyList<long>?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(BuildSummary());
 
         await _sut.GetSummaryAsync(1, ["ROLE_A", "ROLE_B"], CancellationToken.None);
 
         await _repo.Received(1).GetSummaryAsync(
+            17L,
             Arg.Any<IReadOnlyList<long>?>(),
             Arg.Is<IReadOnlyList<string>>(r => r.SequenceEqual(new[] { "ROLE_A", "ROLE_B" })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_WithGlobalAccess_StillScopesRepositoryToTenantCompany()
+    {
+        _rbacService.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
+        _repo.GetSummaryAsync(42L, null, Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(BuildSummary());
+        _tenantContext.CompanyId.Returns(42L);
+
+        await _sut.GetSummaryAsync(1, ["SUPER_ADMIN"], CancellationToken.None);
+
+        await _repo.Received(1).GetSummaryAsync(
+            42L,
+            null,
+            Arg.Is<IReadOnlyList<string>>(roles => roles.SequenceEqual(new[] { "SUPER_ADMIN" })),
             Arg.Any<CancellationToken>());
     }
 
@@ -103,6 +128,7 @@ public class DashboardServiceTests
         _warehouseContext.WarehouseId.Returns(9L);
         _repo.GetTodayActivitiesAsync(
                 Arg.Any<DashboardActivityQuery>(),
+                17L,
                 Arg.Is<IReadOnlyList<long>?>(ids => ids != null && ids.SequenceEqual(new long[] { 9L })),
                 Arg.Any<CancellationToken>())
             .Returns((new List<DashboardActivityResponse> { BuildActivity() }, 1));
@@ -121,6 +147,7 @@ public class DashboardServiceTests
         _userRepo.GetUserWarehouseIdsAsync(2, Arg.Any<CancellationToken>()).Returns([1L, 2L]);
         _repo.GetTodayActivitiesAsync(
                 Arg.Any<DashboardActivityQuery>(),
+                17L,
                 Arg.Is<IReadOnlyList<long>?>(ids => ids != null && ids.SequenceEqual(new long[] { 1L, 2L })),
                 Arg.Any<CancellationToken>())
             .Returns((new List<DashboardActivityResponse>(), 0));
@@ -139,7 +166,7 @@ public class DashboardServiceTests
         _warehouseContext.IsSet.Returns(false);
         _rbacService.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
         var expected = new DashboardHistoryResponse([], []);
-        _repo.GetHistoryAsync(2026, 6, null, Arg.Any<CancellationToken>()).Returns(expected);
+        _repo.GetHistoryAsync(2026, 6, 17L, null, Arg.Any<CancellationToken>()).Returns(expected);
 
         var result = await _sut.GetHistoryAsync(2026, 6, 1, CancellationToken.None);
 
@@ -151,12 +178,12 @@ public class DashboardServiceTests
     {
         _warehouseContext.IsSet.Returns(false);
         _rbacService.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
-        _repo.GetHistoryAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<long>?>(), Arg.Any<CancellationToken>())
+        _repo.GetHistoryAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<long>(), Arg.Any<IReadOnlyList<long>?>(), Arg.Any<CancellationToken>())
             .Returns(new DashboardHistoryResponse([], []));
 
         await _sut.GetHistoryAsync(2025, 3, 1, CancellationToken.None);
 
-        await _repo.Received(1).GetHistoryAsync(2025, 3, Arg.Any<IReadOnlyList<long>?>(), Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetHistoryAsync(2025, 3, 17L, Arg.Any<IReadOnlyList<long>?>(), Arg.Any<CancellationToken>());
     }
 
     private static DashboardSummaryResponse BuildSummary() =>

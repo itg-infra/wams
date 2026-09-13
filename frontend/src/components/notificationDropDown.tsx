@@ -4,7 +4,6 @@ import { Bell } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNotificationStore } from "../master_data/store/listNotificationStore";
 import { formatRelativeTime } from "./format/formatRelativeTime";
-import { useNotificationController } from "../master_data/controller/listNotificationController";
 import type { ListNotification } from "../types/listNotifications";
 
 interface Props {
@@ -34,8 +33,6 @@ export default function NotificationDropdown({
     loadMoreNotifications,
     setUnreadOnly,
   } = useNotificationStore();
-
-  const { handleNotificationClick } = useNotificationController();
 
   useEffect(() => {
     if (open && notifications.length === 0) {
@@ -180,9 +177,7 @@ export default function NotificationDropdown({
                   <button
                     key={item.id}
                     onClick={async () => {
-                      await handleNotificationClick(item);
-
-                      onNotificationClick?.(item);
+                      await onNotificationClick?.(item);
                     }}
                     className="w-full text-left px-4 py-3 border-b hover:bg-gray-50 transition"
                   >

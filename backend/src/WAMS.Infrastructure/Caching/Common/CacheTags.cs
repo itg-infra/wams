@@ -71,6 +71,7 @@ internal static class CacheKeys
 
     // WarehouseShadow
     internal static string WarehouseShadowAll(
+        long companyId,
         long userId,
         string? search,
         long? provinceId,
@@ -79,10 +80,10 @@ internal static class CacheKeys
         int page,
         int limit
     )
-        => $"warehouse-shadow:all:{userId}:s{search}:prov{provinceId}:sb{sortBy}:so{sortOrder}:p{page}:l{limit}";
+        => $"warehouse-shadow:all:{companyId}:{userId}:s{search}:prov{provinceId}:sb{sortBy}:so{sortOrder}:p{page}:l{limit}";
 
-    internal static string WarehouseShadowById(long id, long userId) => $"warehouse-shadow:{id}:{userId}";
-    internal static string WarehouseShadowLocations(long userId) => $"warehouse-shadow:locations:{userId}";
+    internal static string WarehouseShadowById(long id, long companyId, long userId) => $"warehouse-shadow:{companyId}:{id}:{userId}";
+    internal static string WarehouseShadowLocations(long companyId, long userId) => $"warehouse-shadow:locations:{companyId}:{userId}";
 
     // RateCard
     internal static string RateCardById(long id) => $"rate-card:{id}";

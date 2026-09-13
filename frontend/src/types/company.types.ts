@@ -4,6 +4,8 @@ export interface Company {
     id: number;
     code: string;
     name: string;
+    logoUrl: string | null;
+    hasLogo: boolean;
 }
 
 export type CompanyListResponse = ApiResponse<Company[]>;

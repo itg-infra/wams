@@ -20,19 +20,12 @@ export const useNotificationController = () => {
     markAsRead,
     markAllAsRead,
 
-    connectStream,
-    disconnectStream,
   } = useNotificationStore();
 
   useEffect(() => {
     fetchNotifications(false);
 
-    connectStream();
-
-    return () => {
-      disconnectStream();
-    };
-  }, []);
+  }, [fetchNotifications]);
 
   const handleMarkAllRead = async () => {
     await markAllAsRead();

@@ -35,14 +35,12 @@ import WorkflowTemplateListPage from "./screens/workflowListScreen";
 import WorkflowTemplateFormPage from "./screens/workflowTemplateForm";
 import WorkflowTemplateDetailPage from "./screens/workflowDetailScreen";
 import FormEditWoScreen from "./screens/formEditWoScreen";
-import NotificationStream from "./components/notificaitonStream";
 import MasterTaxScreen from "./screens/masterTaxScreen";
 import { RequirePermission } from "./router/requirePermission";
 import FormTaxScreen from "./screens/formTaxScreen";
 import DetailFinanceReport from "./screens/detailFinanceReport";
 import RecapApdpScreen from "./screens/recapApdpScreen";
 import RecapNonApdp from "./screens/recapNonApdp";
-import ListSettlementReport from "./screens/listSettlementReport";
 import AddUserScreen from "./screens/add_users_screen";
 import AddRoleScreen from "./screens/add_role_screen";
 import { DetailApScreen } from "./screens/detailApScreen";
@@ -59,8 +57,6 @@ export default function App() {
           duration: 4000,
         }}
       />
-      <NotificationStream />
-
       <Routes>
         {/* Guest */}
         <Route element={<GuestRoute />}>
@@ -225,12 +221,6 @@ export default function App() {
 
             <Route path="finance/recap-nonapdp" element={<RecapNonApdp />} />
 
-            {/* The screen was written and carries its ids, but was never
-                registered here — so the whole menu was unreachable. */}
-            <Route
-              path="finance/settlement-report"
-              element={<ListSettlementReport />}
-            />
           </Route>
         </Route>
 

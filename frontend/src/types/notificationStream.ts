@@ -9,5 +9,6 @@ export interface NotificationStreamResponse {
   CreatedAt: string;
   ReadAt: string | null;
   RecipientUserId: number;
-  ActorUserId: number;
+  ActorUserId: number | null;
+  Route: string | null;
 }

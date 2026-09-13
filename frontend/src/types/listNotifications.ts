@@ -10,7 +10,7 @@ export interface ListNotification {
   readAt: string | null;
   recipientUserId: number;
   actorUserId: number | null;
-  route: string;
+  route: string | null;
 }
 
 export interface ListNotificationMeta {

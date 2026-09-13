@@ -12,11 +12,13 @@ export default function NotificationStream() {
 
   useEffect(() => {
     connectStream();
+    window.addEventListener("beforeunload", disconnectStream);
 
     return () => {
+      window.removeEventListener("beforeunload", disconnectStream);
       disconnectStream();
     };
-  }, []);
+  }, [connectStream, disconnectStream]);
 
   return null;
 }

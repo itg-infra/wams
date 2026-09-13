@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using WAMS.Application.DTOs.Common;
 using WAMS.Application.DTOs.Warehouses;
 using WAMS.Application.Interfaces.Warehouses;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Infrastructure.Caching.Common;
 
 /// <summary>
@@ -18,7 +19,8 @@ using WAMS.Infrastructure.Caching.Common;
 public sealed class CachedWarehouseShadowService(
     [FromKeyedServices(ServiceKeys.Real)] IWarehouseShadowService inner,
     HybridCache cache,
-    IOptions<WamsCacheOptions> options) : IWarehouseShadowService
+    IOptions<WamsCacheOptions> options,
+    ITenantContext tenantContext) : IWarehouseShadowService
 {
     private readonly HybridCacheEntryOptions _opts = options.Value.WarehouseShadow.ToHybridOptions();
 
@@ -29,6 +31,7 @@ public sealed class CachedWarehouseShadowService(
     )
         => await cache.GetOrCreateAsync(
             CacheKeys.WarehouseShadowAll(
+                GetCompanyId(),
                 userId,
                 query.Search,
                 query.ProvinceId,
@@ -49,7 +52,7 @@ public sealed class CachedWarehouseShadowService(
         CancellationToken ct = default
     )
         => await cache.GetOrCreateAsync(
-            CacheKeys.WarehouseShadowById(id, userId),
+            CacheKeys.WarehouseShadowById(id, GetCompanyId(), userId),
             async cancel => await inner.GetByIdAsync(id, userId, cancel),
             _opts,
             [CacheTags.WarehouseShadows, CacheTags.WarehouseShadowsForUser(userId)],
@@ -58,7 +61,7 @@ public sealed class CachedWarehouseShadowService(
 
     public async Task<List<ProvinceOption>> GetDistinctLocationsAsync(long userId, CancellationToken ct = default)
         => await cache.GetOrCreateAsync(
-            CacheKeys.WarehouseShadowLocations(userId),
+            CacheKeys.WarehouseShadowLocations(GetCompanyId(), userId),
             async cancel => await inner.GetDistinctLocationsAsync(userId, cancel),
             _opts,
             [CacheTags.WarehouseShadows, CacheTags.WarehouseShadowsForUser(userId)],
@@ -77,4 +80,9 @@ public sealed class CachedWarehouseShadowService(
     // Not cached - admin-only endpoint; results change after sync runs
     public Task<List<WarehouseResponse>> GetUnmappedAsync(long userId, CancellationToken ct = default)
         => inner.GetUnmappedAsync(userId, ct);
+
+    private long GetCompanyId()
+        => tenantContext.IsSet && tenantContext.CompanyId.HasValue
+            ? tenantContext.CompanyId.Value
+            : throw new InvalidOperationException("Warehouse cache access requires an active company tenant.");
 }

@@ -46,7 +46,34 @@ interface NotificationState {
   reset: () => void;
 }
 
-let notificationEventSource: EventSource | null = null;
+let notificationEventSource: ReturnType<typeof createNotificationStream> = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
+let reconnectEnabled = false;
+
+const reconnectDelay = () => Math.min(1_000 * 2 ** reconnectAttempt++, 30_000);
+
+const clearReconnectTimer = () => {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+};
+
+const toListNotification = (
+  notification: NotificationStreamResponse,
+): ListNotification => ({
+  id: notification.Id,
+  type: notification.Type,
+  title: notification.Title,
+  message: notification.Message,
+  referenceType: notification.ReferenceType,
+  referenceId: notification.ReferenceId,
+  status: notification.Status,
+  createdAt: notification.CreatedAt,
+  readAt: notification.ReadAt,
+  recipientUserId: notification.RecipientUserId,
+  actorUserId: notification.ActorUserId,
+  route: notification.Route,
+});
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
@@ -178,56 +205,67 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   addNotification: (notification: NotificationStreamResponse) => {
-    const { unreadOnly } = get();
+    const { notifications, unreadOnly } = get();
 
     if (unreadOnly && notification.Status !== "unread") return;
-
-    showNotificationToast(notification);
+    if (notifications.some((item) => item.id === notification.Id)) return;
 
     set((state) => {
-      // ✅ state di sini selalu fresh/terbaru
-      const exists = state.notifications.some(
-        (item) => item.id === notification.Id,
-      );
-
-      if (exists) return state;
-
-      showNotificationToast(notification);
-
       return {
+        notifications: [toListNotification(notification), ...state.notifications],
         notificationStream: notification,
       };
     });
+
+    showNotificationToast(notification);
   },
 
   connectStream: () => {
-    if (notificationEventSource) {
-      return;
-    }
+    reconnectEnabled = true;
+    if (notificationEventSource || reconnectTimer) return;
 
     notificationEventSource = createNotificationStream(
       (notification: NotificationStreamResponse) => {
+        reconnectAttempt = 0;
         get().addNotification(notification);
       },
       () => {
         notificationEventSource = null;
+        if (!reconnectEnabled || reconnectTimer) return;
+
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          get().connectStream();
+        }, reconnectDelay());
+      },
+      () => {
+        reconnectAttempt = 0;
       },
     );
+
+    if (!notificationEventSource) reconnectEnabled = false;
   },
 
   disconnectStream: () => {
+    reconnectEnabled = false;
+    reconnectAttempt = 0;
+    clearReconnectTimer();
     notificationEventSource?.close();
 
     notificationEventSource = null;
   },
 
   reset: () => {
+    reconnectEnabled = false;
+    reconnectAttempt = 0;
+    clearReconnectTimer();
     notificationEventSource?.close();
 
     notificationEventSource = null;
 
     set({
       notifications: [],
+      notificationStream: null,
       page: 1,
       totalPages: 1,
       hasMore: true,

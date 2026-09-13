@@ -41,6 +41,8 @@ export type PermissionMap = Record<
 export interface User {
     id: number;
     companyId: string,
+    companyName: string;
+    companyCode: string;
     email: string;
     fullname: string;
     employeeId: string | null;
@@ -56,6 +58,8 @@ export interface User {
 export const mapUser = (data: MeResponseData): User => ({
     id: data.id,
     companyId: String(data.companyId),
+    companyName: data.companyName,
+    companyCode: data.companyCode,
     email: data.email,
     fullname: data.fullname,
     employeeId: data.employeeId,

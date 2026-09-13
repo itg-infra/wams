@@ -7,6 +7,7 @@ using WAMS.Application.DTOs.Roles;
 using WAMS.Application.DTOs.Warehouses;
 using WAMS.Application.Interfaces.Rbac;
 using WAMS.Application.Interfaces.Warehouses;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Infrastructure.Caching.Rbac;
 using WAMS.Infrastructure.Caching.Warehouses;
 using Xunit;
@@ -28,6 +29,7 @@ public sealed class CachedRbacServiceWarehouseShadowInvalidationTests : IDisposa
     private readonly CacheTestFixture _fx = new();
     private readonly IRbacService _rbacInner = Substitute.For<IRbacService>();
     private readonly IWarehouseShadowService _warehouseInner = Substitute.For<IWarehouseShadowService>();
+    private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly CachedRbacService _rbacSut;
     private readonly CachedWarehouseShadowService _warehouseSut;
 
@@ -37,7 +39,9 @@ public sealed class CachedRbacServiceWarehouseShadowInvalidationTests : IDisposa
     public CachedRbacServiceWarehouseShadowInvalidationTests()
     {
         _rbacSut = new CachedRbacService(_rbacInner, _fx.Cache, _fx.Options);
-        _warehouseSut = new CachedWarehouseShadowService(_warehouseInner, _fx.Cache, _fx.Options);
+        _tenantContext.IsSet.Returns(true);
+        _tenantContext.CompanyId.Returns(1L);
+        _warehouseSut = new CachedWarehouseShadowService(_warehouseInner, _fx.Cache, _fx.Options, _tenantContext);
     }
 
     public void Dispose() => _fx.Dispose();

@@ -104,6 +104,7 @@ export default function DashboardContent() {
   // }, [fetchDashboard]);
 
   const firstName = user?.fullname?.split(" ")[0] ?? "Nama";
+  const companyName = user?.companyName ?? user?.companyCode ?? "Perusahaan";
 
   const columns: Column<HistoryActivity>[] = [
     {
@@ -155,7 +156,7 @@ export default function DashboardContent() {
       >
         <div className="relative z-10">
           <h2 className="text-white text-xl font-bold">
-            Selamat Datang {firstName} di Dashboard GCU
+            Selamat Datang {firstName} di Dashboard {companyName}
           </h2>
           <p className="text-indigo-200 text-sm mt-0.5">
             {new Intl.DateTimeFormat("id-ID", {
