@@ -47,6 +47,20 @@ public class TenantMiddlewareTests
     }
 
     [Fact]
+    public async Task MembershipClaim_CallsSetMembershipAlongsideCompany()
+    {
+        var ctx = BuildContext([
+            new Claim("company_id", "42"),
+            new Claim("user_company_id", "99")
+        ]);
+
+        await _sut.InvokeAsync(ctx, _tenantContext);
+
+        _tenantContext.Received(1).SetCompanyId(42);
+        _tenantContext.Received(1).SetMembership(99);
+    }
+
+    [Fact]
     public async Task UnauthenticatedRequest_DoesNotSetTenantContext()
     {
         var ctx = BuildContext([], authenticated: false);

@@ -122,6 +122,29 @@ public class BudgetPlanServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ApproveAsync_WithMembershipContext_UsesCompanyScopedApproverLookup()
+    {
+        var plan = BuildPlanWithWorkflow(BudgetPlanStatus.Submitted, pendingStageOrder: 1);
+        _tenantContext.UserCompanyId.Returns(77L);
+        _budgetPlanRepo.GetByIdForApprovalAsync(1, Arg.Any<CancellationToken>()).Returns(plan);
+        _userRepo.CheckWarehouseAccessAsync(50, 10, Arg.Any<CancellationToken>()).Returns((true, true));
+        _userRepo.GetUsersByRolesAndWarehouseForCompanyAsync(
+                1, 10, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns([TestBuilders.ActiveUser(id: 70)]);
+
+        await _sut.ApproveAsync(1, 50, ["WAREHOUSE_HEAD"], TestContext.Current.CancellationToken);
+
+        await _userRepo.Received(1).GetUsersByRolesAndWarehouseForCompanyAsync(
+            1, 10, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>());
+        await _userRepo.DidNotReceive().GetUsersByRolesAndWarehouseAsync(
+            Arg.Any<long>(), Arg.Any<long>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>());
+        await _notificationService.Received(1).PublishAsync(
+            Arg.Is<IEnumerable<NotificationCreateRequest>>(items =>
+                items.Any(x => x.RecipientUserId == 70 && x.CompanyId == 1)),
+            Arg.Any<CancellationToken>());
+    }
+
     // Segregation of duties: self-approval requires the approval.self.approve permission,
     // which the budget.*.* wildcard (HO_SPV, LOG_MGR, LOG_SPV) does not confer.
     [Fact]

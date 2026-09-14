@@ -26,5 +26,6 @@ public interface IUserService
     Task<bool> HasGlobalAccessAsync(long userId, CancellationToken ct = default);
     Task<List<long>> GetUserWarehouseIdsAsync(long userId, CancellationToken ct = default);
     Task<List<long>> GetUserProvinceIdsAsync(long userId, CancellationToken ct = default);
+    Task<List<long>> GetUserProvinceIdsAsync(long userId, long? userCompanyId, CancellationToken ct = default);
     Task EnsureCanMutateAsync(long actorUserId, long targetUserId, bool deactivates = false, bool removesSuperAdmin = false, bool grantsSuperAdmin = false);
 }

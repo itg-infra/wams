@@ -52,6 +52,30 @@ public sealed class CachedRbacService : IRbacService
             ct
         );
 
+    public async Task<bool> HasPermissionAsync(
+        long userId,
+        long? userCompanyId,
+        string module,
+        string resource,
+        string action,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+            return await _cache.GetOrCreateAsync(
+                CacheKeys.RbacSystemPerm(userId, module, resource, action),
+                async cancel => await _inner.HasPermissionAsync(userId, null, module, resource, action, cancel),
+                _permOpts,
+                [CacheTags.RbacUser(userId), CacheTags.RbacAllPerms],
+                ct);
+
+        return await _cache.GetOrCreateAsync(
+            CacheKeys.RbacMembershipPerm(userCompanyId.Value, module, resource, action),
+            async cancel => await _inner.HasPermissionAsync(userId, userCompanyId, module, resource, action, cancel),
+            _permOpts,
+            [CacheTags.RbacMembership(userCompanyId.Value), CacheTags.RbacAllPerms],
+            ct);
+    }
+
     public async Task<bool> HasGlobalAccessAsync(long userId, CancellationToken ct = default)
         => await _cache.GetOrCreateAsync(
             CacheKeys.RbacGlobal(userId),
@@ -60,6 +84,27 @@ public sealed class CachedRbacService : IRbacService
             [CacheTags.RbacUser(userId), CacheTags.RbacAllPerms],
             ct
         );
+
+    public async Task<bool> HasGlobalAccessAsync(
+        long userId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+            return await _cache.GetOrCreateAsync(
+                CacheKeys.RbacGlobal(userId),
+                async cancel => await _inner.HasGlobalAccessAsync(userId, null, cancel),
+                _permOpts,
+                [CacheTags.RbacUser(userId), CacheTags.RbacAllPerms],
+                ct);
+
+        return await _cache.GetOrCreateAsync(
+            CacheKeys.RbacMembershipGlobal(userCompanyId.Value),
+            async cancel => await _inner.HasGlobalAccessAsync(userId, userCompanyId, cancel),
+            _permOpts,
+            [CacheTags.RbacMembership(userCompanyId.Value), CacheTags.RbacAllPerms],
+            ct);
+    }
 
     public async Task<List<PermissionInfo>> GetAllPermissionsAsync(CancellationToken ct = default)
         => await _cache.GetOrCreateAsync(

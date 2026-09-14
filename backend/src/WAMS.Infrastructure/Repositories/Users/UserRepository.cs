@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using WAMS.Application.Common;
 using WAMS.Application.DTOs.Users;
 using WAMS.Application.Interfaces.Users;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Domain.Constants;
 using WAMS.Domain.Entities.Users;
 using WAMS.Infrastructure.Data;
@@ -12,22 +13,57 @@ using WAMS.Infrastructure.Data;
 public class UserRepository : IUserRepository
 {
     private readonly AppDbContext _db;
+    private readonly ITenantContext? _tenantContext;
 
-    public UserRepository(AppDbContext db) => _db = db;
+    public UserRepository(AppDbContext db, ITenantContext? tenantContext = null)
+    {
+        _db = db;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<User?> GetByIdAsync(long id, CancellationToken ct = default)
-        => await _db.Users
+    {
+        if (_tenantContext?.CompanyId is long companyId)
+        {
+            return await _db.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.DeletedAt == null &&
+                    u.UserCompanies.Any(m => m.CompanyId == companyId && m.RemovedAt == null) &&
+                    u.Id == id)
+                .Include(u => u.Company)
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .Include(u => u.UserCompanies).ThenInclude(uc => uc.Company)
+                .Include(u => u.UserCompanies).ThenInclude(uc => uc.Roles).ThenInclude(ucr => ucr.Role)
+                .Include(u => u.UserCompanies).ThenInclude(uc => uc.Warehouses).ThenInclude(ucw => ucw.Warehouse)
+                .Include(u => u.UserCompanies).ThenInclude(uc => uc.Provinces).ThenInclude(ucp => ucp.Province)
+                .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
+                .Include(u => u.UserProvinces).ThenInclude(up => up.Province)
+                .AsSplitQuery()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(ct);
+        }
+
+        return await _db.Users
             .Include(u => u.Company)
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Company)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Roles).ThenInclude(ucr => ucr.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Warehouses).ThenInclude(ucw => ucw.Warehouse)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Provinces).ThenInclude(ucp => ucp.Province)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
             .Include(u => u.UserProvinces).ThenInclude(up => up.Province)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == id, ct);
+    }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
         => await _db.Users
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Company)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Roles).ThenInclude(ucr => ucr.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Warehouses).ThenInclude(ucw => ucw.Warehouse)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Provinces).ThenInclude(ucp => ucp.Province)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email == email, ct);
@@ -49,10 +85,45 @@ public class UserRepository : IUserRepository
             .Where(u => u.Email == email && u.DeletedAt == null)
             .FirstOrDefaultAsync(ct);
 
+    public async Task<(User User, UserCompany? Membership)?> GetLoginIdentityAsync(
+        string email,
+        long companyId,
+        CancellationToken ct = default)
+    {
+        var user = await _db.Users
+            .IgnoreQueryFilters()
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                    .ThenInclude(r => r.RolePermissions)
+                        .ThenInclude(rp => rp.Permission)
+            .Include(u => u.UserCompanies.Where(uc =>
+                uc.CompanyId == companyId && uc.RemovedAt == null))
+                .ThenInclude(uc => uc.Company)
+            .Include(u => u.UserCompanies.Where(uc =>
+                uc.CompanyId == companyId && uc.RemovedAt == null))
+                .ThenInclude(uc => uc.Roles)
+                    .ThenInclude(ucr => ucr.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+            .AsSplitQuery()
+            .Where(u => u.Email == email && u.DeletedAt == null)
+            .FirstOrDefaultAsync(ct);
+
+        return user is null
+            ? null
+            : (user, user.UserCompanies.SingleOrDefault(uc =>
+                uc.CompanyId == companyId && uc.RemovedAt == null));
+    }
+
     public async Task<(List<User> Items, int TotalCount)> GetAllAsync(DataTableQuery q, CancellationToken ct = default)
     {
         // Base query without includes - avoids cartesian product on the COUNT
-        var baseQuery = _db.Users.AsQueryable();
+        IQueryable<User> baseQuery = _tenantContext?.CompanyId is long companyId
+            ? _db.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.DeletedAt == null &&
+                    u.UserCompanies.Any(m => m.CompanyId == companyId && m.RemovedAt == null))
+            : _db.Users;
 
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
@@ -79,6 +150,10 @@ public class UserRepository : IUserRepository
         // AsSplitQuery avoids cartesian explosion from users × roles × warehouses JOIN
         var items = await baseQuery
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Company)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Roles).ThenInclude(ucr => ucr.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Warehouses).ThenInclude(ucw => ucw.Warehouse)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Provinces).ThenInclude(ucp => ucp.Province)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
             .Include(u => u.UserProvinces).ThenInclude(up => up.Province)
             .AsNoTracking()
@@ -91,7 +166,12 @@ public class UserRepository : IUserRepository
 
     public IAsyncEnumerable<UserResponse> StreamAllAsync(DataTableQuery q, int limit, CancellationToken ct = default)
     {
-        var baseQuery = _db.Users.AsQueryable();
+        IQueryable<User> baseQuery = _tenantContext?.CompanyId is long companyId
+            ? _db.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.DeletedAt == null &&
+                    u.UserCompanies.Any(m => m.CompanyId == companyId && m.RemovedAt == null))
+            : _db.Users;
 
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
@@ -179,6 +259,28 @@ public class UserRepository : IUserRepository
         return await fromProvinces.Union(explicitIds).Distinct().ToListAsync(ct);
     }
 
+    public async Task<List<long>> GetUserWarehouseIdsAsync(
+        long userId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+            return await GetUserWarehouseIdsAsync(userId, ct);
+
+        var provinceIds = await GetUserProvinceIdsAsync(userId, userCompanyId, ct);
+        var fromProvinces = _db.WarehouseShadows
+            .Where(w => w.ProvinceId != null && provinceIds.Contains(w.ProvinceId.Value))
+            .Select(w => w.Id);
+        var explicitIds = _db.UserCompanyWarehouses
+            .Where(ucw => ucw.UserCompanyId == userCompanyId &&
+                         ucw.UserCompany.UserId == userId &&
+                         ucw.UserCompany.RemovedAt == null &&
+                         ucw.Warehouse.CompanyId == ucw.UserCompany.CompanyId)
+            .Select(ucw => ucw.WarehouseId);
+
+        return await fromProvinces.Union(explicitIds).Distinct().ToListAsync(ct);
+    }
+
     // Provinces a user has province-level scope over: their DIRECT province
     // assignments plus the always-visible GLOBAL province. Deliberately does NOT
     // back-derive a province from an explicit warehouse pin - a fine-grained pin
@@ -189,6 +291,26 @@ public class UserRepository : IUserRepository
             .Where(up => up.UserId == userId)
             .Select(up => up.ProvinceId);
 
+        var globalId = _db.Provinces
+            .Where(p => p.Code == ProvinceCodes.Global)
+            .Select(p => p.Id);
+
+        return await direct.Union(globalId).Distinct().ToListAsync(ct);
+    }
+
+    public async Task<List<long>> GetUserProvinceIdsAsync(
+        long userId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+            return await GetUserProvinceIdsAsync(userId, ct);
+
+        var direct = _db.UserCompanyProvinces
+            .Where(ucp => ucp.UserCompanyId == userCompanyId &&
+                         ucp.UserCompany.UserId == userId &&
+                         ucp.UserCompany.RemovedAt == null)
+            .Select(ucp => ucp.ProvinceId);
         var globalId = _db.Provinces
             .Where(p => p.Code == ProvinceCodes.Global)
             .Select(p => p.Id);
@@ -254,6 +376,29 @@ public class UserRepository : IUserRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<User>> GetUsersByRolesAndWarehouseForCompanyAsync(
+        long companyId,
+        long warehouseId,
+        IReadOnlyCollection<string> roleNames,
+        CancellationToken ct = default)
+    {
+        if (roleNames.Count == 0) return [];
+        var warehouse = await _db.WarehouseShadows.IgnoreQueryFilters()
+            .Where(w => w.Id == warehouseId)
+            .Select(w => new { w.CompanyId, w.ProvinceId, IsGlobal = w.Province != null && w.Province.Code == ProvinceCodes.Global })
+            .FirstOrDefaultAsync(ct);
+        if (warehouse is null || warehouse.CompanyId != companyId) return [];
+
+        return await _db.UserCompanies.IgnoreQueryFilters()
+            .Where(m => m.CompanyId == companyId && m.RemovedAt == null && m.User.IsActive && m.User.DeletedAt == null)
+            .Where(m => m.Roles.Any(r => roleNames.Contains(r.Role.Name) && (r.ExpiresAt == null || r.ExpiresAt > DateTime.UtcNow)))
+            .Where(m => warehouse.IsGlobal || m.Warehouses.Any(w => w.WarehouseId == warehouseId) ||
+                (warehouse.ProvinceId != null && m.Provinces.Any(p => p.ProvinceId == warehouse.ProvinceId)))
+            .Select(m => m.User)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
     public async Task<List<User>> GetUsersByPermissionAndWarehouseAsync(
         long companyId,
         long warehouseId,
@@ -295,6 +440,41 @@ public class UserRepository : IUserRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<User>> GetUsersByPermissionAndWarehouseForCompanyAsync(
+        long companyId,
+        long warehouseId,
+        string permissionKey,
+        CancellationToken ct = default)
+    {
+        var parts = permissionKey.Split('.');
+        if (parts.Length != 3) return [];
+        var permissionId = await _db.Permissions
+            .Where(p => p.Module == parts[0] && p.Resource == parts[1] && p.Action == parts[2])
+            .Select(p => (long?)p.Id)
+            .FirstOrDefaultAsync(ct);
+        if (permissionId is null) return [];
+
+        var warehouse = await _db.WarehouseShadows.IgnoreQueryFilters()
+            .Where(w => w.Id == warehouseId)
+            .Select(w => new { w.CompanyId, w.ProvinceId, IsGlobal = w.Province != null && w.Province.Code == ProvinceCodes.Global })
+            .FirstOrDefaultAsync(ct);
+        if (warehouse is null || warehouse.CompanyId != companyId) return [];
+        var now = DateTime.UtcNow;
+
+        return await _db.UserCompanies.IgnoreQueryFilters()
+            .Where(m => m.CompanyId == companyId && m.RemovedAt == null && m.User.IsActive && m.User.DeletedAt == null)
+            .Where(m => warehouse.IsGlobal || m.Warehouses.Any(w => w.WarehouseId == warehouseId) ||
+                (warehouse.ProvinceId != null && m.Provinces.Any(p => p.ProvinceId == warehouse.ProvinceId)))
+            .Where(m => m.Roles.Any(r => r.Role.RolePermissions.Any(rp => rp.PermissionId == permissionId) &&
+                (r.ExpiresAt == null || r.ExpiresAt > now)) ||
+                m.Permissions.Any(p => p.PermissionId == permissionId && p.IsGranted && (p.ExpiresAt == null || p.ExpiresAt > now)))
+            .Where(m => !m.Permissions.Any(p => p.PermissionId == permissionId && !p.IsGranted &&
+                (p.ExpiresAt == null || p.ExpiresAt > now)))
+            .Select(m => m.User)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> HasGlobalAccessAsync(long userId, CancellationToken ct = default)
         => await _db.UserRoles
             .Where(ur => ur.UserId == userId)
@@ -326,6 +506,45 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(ct);
 
         return row is null ? (false, false) : (true, row.HasAccess);
+    }
+
+    public async Task<(bool WarehouseExists, bool HasAccess)> CheckWarehouseAccessAsync(
+        long userId,
+        long warehouseId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+            return await CheckWarehouseAccessAsync(userId, warehouseId, ct);
+
+        var warehouse = await _db.WarehouseShadows
+            .Where(w => w.Id == warehouseId)
+            .Select(w => new { w.CompanyId, w.ProvinceId, IsGlobal = w.Province != null && w.Province.Code == ProvinceCodes.Global })
+            .FirstOrDefaultAsync(ct);
+        if (warehouse is null)
+            return (false, false);
+
+        var membership = _db.UserCompanyProvinces
+            .Where(ucp => ucp.UserCompanyId == userCompanyId &&
+                         ucp.UserCompany.UserId == userId &&
+                         ucp.UserCompany.RemovedAt == null);
+        var hasAccess = await _db.UserCompanyRoles.AnyAsync(ucr =>
+                ucr.UserCompanyId == userCompanyId &&
+                ucr.UserCompany.UserId == userId &&
+                ucr.UserCompany.RemovedAt == null &&
+                ucr.Role.GlobalAccess, ct)
+            || await _db.UserCompanyWarehouses.AnyAsync(ucw =>
+                ucw.UserCompanyId == userCompanyId &&
+                ucw.UserCompany.UserId == userId &&
+                ucw.UserCompany.RemovedAt == null &&
+                ucw.WarehouseId == warehouseId &&
+                ucw.Warehouse.CompanyId == ucw.UserCompany.CompanyId, ct)
+            || warehouse.IsGlobal
+            || (warehouse.ProvinceId.HasValue && await membership.AnyAsync(
+                ucp => ucp.ProvinceId == warehouse.ProvinceId.Value, ct));
+
+        return (true, hasAccess && warehouse.CompanyId ==
+            await _db.UserCompanies.Where(uc => uc.Id == userCompanyId).Select(uc => uc.CompanyId).FirstAsync(ct));
     }
 
     public async Task AssignWarehouseAsync(
@@ -376,6 +595,11 @@ public class UserRepository : IUserRepository
             .IgnoreQueryFilters()
             .Include(u => u.Company)
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Company)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Roles).ThenInclude(ucr => ucr.Role)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Warehouses).ThenInclude(ucw => ucw.Warehouse)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Provinces).ThenInclude(ucp => ucp.Province)
+            .Include(u => u.UserCompanies).ThenInclude(uc => uc.Permissions).ThenInclude(ucp => ucp.Permission)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
             .Include(u => u.UserProvinces).ThenInclude(up => up.Province)
             .AsSplitQuery()

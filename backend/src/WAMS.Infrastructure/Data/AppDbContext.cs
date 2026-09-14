@@ -55,12 +55,17 @@ public class AppDbContext : DbContext
 
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
+    public DbSet<UserCompanyRole> UserCompanyRoles => Set<UserCompanyRole>();
+    public DbSet<UserCompanyWarehouse> UserCompanyWarehouses => Set<UserCompanyWarehouse>();
+    public DbSet<UserCompanyProvince> UserCompanyProvinces => Set<UserCompanyProvince>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<WarehouseShadow> WarehouseShadows => Set<WarehouseShadow>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<UserCompanyPermission> UserCompanyPermissions => Set<UserCompanyPermission>();
     public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VendorShadow> VendorShadows => Set<VendorShadow>();
@@ -132,6 +137,11 @@ public class AppDbContext : DbContext
             u.DeletedAt == null &&
             (_tenantContext == null || !_tenantContext.IsSet || !_tenantContext.CompanyId.HasValue ||
              (long?)u.CompanyId == _tenantContext.CompanyId));
+
+        modelBuilder.Entity<UserCompany>().HasQueryFilter(uc =>
+            uc.RemovedAt == null &&
+            (_tenantContext == null || !_tenantContext.IsSet || !_tenantContext.CompanyId.HasValue ||
+             (long?)uc.CompanyId == _tenantContext.CompanyId));
 
         modelBuilder.Entity<WarehouseShadow>().HasQueryFilter(w =>
             _tenantContext == null || !_tenantContext.IsSet || !_tenantContext.CompanyId.HasValue ||

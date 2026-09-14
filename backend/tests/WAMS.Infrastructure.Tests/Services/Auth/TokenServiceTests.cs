@@ -1,6 +1,8 @@
 using FluentAssertions;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using WAMS.Domain.Entities.Users;
 using Xunit;
 using WAMS.Infrastructure.Services.Auth;
 
@@ -45,5 +47,43 @@ public sealed class TokenServiceTests
         await sut.BlacklistTokenAsync("jti-expiring", TimeSpan.Zero);
 
         (await sut.IsTokenBlacklistedAsync("jti-expiring")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ForMembership_IncludesCompanyAndMembershipClaims()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = new TokenService(_configuration, cache);
+        var token = sut.GenerateAccessToken(
+            new User { Id = 7, Email = "user@example.com", Fullname = "User", SessionVersion = 2 },
+            new[] { "VIEWER" },
+            companyId: 3,
+            userCompanyId: 9,
+            membershipAuthorizationVersion: 4);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        jwt.Claims.Should().Contain(c => c.Type == "company_id" && c.Value == "3");
+        jwt.Claims.Should().Contain(c => c.Type == "user_company_id" && c.Value == "9");
+        jwt.Claims.Should().Contain(c =>
+            c.Type == "membership_authorization_version" && c.Value == "4");
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ForSystemSession_OmitsMembershipClaims()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = new TokenService(_configuration, cache);
+        var token = sut.GenerateAccessToken(
+            new User { Id = 7, Email = "admin@example.com", Fullname = "Admin" },
+            new[] { "SUPER_ADMIN" },
+            companyId: 3,
+            userCompanyId: null,
+            membershipAuthorizationVersion: null,
+            hasWildcard: true);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        jwt.Claims.Should().Contain(c => c.Type == "company_id" && c.Value == "3");
+        jwt.Claims.Should().NotContain(c => c.Type == "user_company_id");
+        jwt.Claims.Should().NotContain(c => c.Type == "membership_authorization_version");
     }
 }

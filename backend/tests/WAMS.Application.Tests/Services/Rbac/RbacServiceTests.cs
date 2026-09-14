@@ -108,6 +108,20 @@ public class RbacServiceTests
         result.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task HasPermissionAsync_UsesSelectedMembershipSnapshot()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _rbacRepo.GetUserRbacSnapshotAsync(1, 101, ct).Returns(Snapshot(keys: ["workorder.workorder.update"]));
+        _rbacRepo.GetUserRbacSnapshotAsync(1, 202, ct).Returns(Snapshot());
+
+        var companyA = await _sut.HasPermissionAsync(1, 101, "workorder", "workorder", "update", ct);
+        var companyB = await _sut.HasPermissionAsync(1, 202, "workorder", "workorder", "update", ct);
+
+        companyA.Should().BeTrue();
+        companyB.Should().BeFalse();
+    }
+
     // CreateRoleAsync
     [Fact]
     public async Task CreateRoleAsync_WithDuplicateName_ThrowsConflictException()

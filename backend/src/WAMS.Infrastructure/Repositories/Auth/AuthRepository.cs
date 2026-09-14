@@ -24,6 +24,15 @@ public class AuthRepository : IAuthRepository
                     .ThenInclude(ur => ur.Role)
                         .ThenInclude(r => r.RolePermissions)
                             .ThenInclude(rp => rp.Permission)
+            .Include(rt => rt.User)
+                .ThenInclude(u => u.UserCompanies)
+                    .ThenInclude(uc => uc.Company)
+            .Include(rt => rt.User)
+                .ThenInclude(u => u.UserCompanies)
+                    .ThenInclude(uc => uc.Roles)
+                        .ThenInclude(ucr => ucr.Role)
+                            .ThenInclude(r => r.RolePermissions)
+                                .ThenInclude(rp => rp.Permission)
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, ct);
 
     public async Task RevokeRefreshTokenAsync(long tokenId, CancellationToken ct = default)

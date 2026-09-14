@@ -1,5 +1,6 @@
 namespace WAMS.Application.Services.Warehouses;
 
+using WAMS.Application.Common;
 using WAMS.Application.DTOs.Common;
 using WAMS.Application.DTOs.Warehouses;
 using WAMS.Application.Interfaces.Common;
@@ -14,7 +15,8 @@ public class WarehouseShadowService(
     IWarehouseShadowRepository warehouseRepo,
     IUserRepository userRepo,
     IRbacService rbacService,
-    IProvinceRepository provinceRepo
+    IProvinceRepository provinceRepo,
+    ITenantContext? tenantContext = null
 ) : IWarehouseShadowService
 {
     public async Task<PaginatedResponse<WarehouseResponse>> GetAllAsync(
@@ -23,7 +25,7 @@ public class WarehouseShadowService(
         CancellationToken ct = default
     )
     {
-        var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
 
         (List<WarehouseShadow> Items, int TotalCount) result;
 
@@ -33,7 +35,7 @@ public class WarehouseShadowService(
         }
         else
         {
-            var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+            var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
             result = await warehouseRepo.GetByIdsAsync(ids, query, ct);
         }
 
@@ -53,7 +55,7 @@ public class WarehouseShadowService(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default
     )
     {
-        var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
 
         IAsyncEnumerable<WarehouseResponse> stream;
 
@@ -63,7 +65,7 @@ public class WarehouseShadowService(
         }
         else
         {
-            var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+            var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
             stream = warehouseRepo.StreamByIdsAsync(ids, query, limit, ct);
         }
 
@@ -87,10 +89,10 @@ public class WarehouseShadowService(
     {
         var all = await provinceRepo.GetAllActiveAsync(ct);
 
-        if (await rbacService.HasGlobalAccessAsync(userId, ct))
+        if (await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
             return [.. all.Select(p => new ProvinceOption(p.Id, p.Name, p.Display))];
 
-        var warehouseIds = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var warehouseIds = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
         var allowed = (await warehouseRepo.GetProvinceIdsForWarehousesAsync(warehouseIds, ct)).ToHashSet();
 
         return [.. all.Where(p => allowed.Contains(p.Id)).Select(p => new ProvinceOption(p.Id, p.Name, p.Display))];
@@ -98,7 +100,7 @@ public class WarehouseShadowService(
 
     public async Task<List<WarehouseResponse>> GetUnmappedAsync(long userId, CancellationToken ct = default)
     {
-        if (!await rbacService.HasGlobalAccessAsync(userId, ct))
+        if (!await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
             throw new ForbiddenException(ErrorMessages.Warehouse.AccessDenied);
 
         var warehouses = await warehouseRepo.GetUnmappedAsync(ct);
@@ -108,10 +110,10 @@ public class WarehouseShadowService(
 
     private async Task EnsureAccessAsync(long userId, long warehouseId, CancellationToken ct)
     {
-        var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
         if (hasGlobal) return;
 
-        var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
         if (!ids.Contains(warehouseId))
             throw new ForbiddenException(ErrorMessages.Warehouse.AccessDenied);
     }

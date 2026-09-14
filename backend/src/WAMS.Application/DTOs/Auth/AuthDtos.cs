@@ -34,5 +34,6 @@ public record MeResponse(
     List<MeWarehouseResponse> Warehouses,
     List<MeProvinceResponse> Scopes,
     DateTime CreatedAt,
-    string? EmployeeId = null
+    string? EmployeeId = null,
+    long? UserCompanyId = null
 );

@@ -7,6 +7,8 @@ public class RefreshToken : BaseEntity
 {
     public long UserId { get; set; }
     public long CompanyId { get; set; }
+    public long? UserCompanyId { get; set; }
+    public int? MembershipAuthorizationVersion { get; set; }
     public string TokenHash { get; set; } = string.Empty;
     public string? DeviceInfo { get; set; }
     public string? IpAddress { get; set; }
@@ -18,4 +20,5 @@ public class RefreshToken : BaseEntity
     public bool IsActive => !IsExpired && !IsRevoked;
 
     public User User { get; set; } = null!;
+    public UserCompany? UserCompany { get; set; }
 }

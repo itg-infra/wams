@@ -21,7 +21,8 @@ public class BudgetTemplateService(
     IProvinceRepository provinceRepo,
     IRbacService rbacService,
     IUserService userService,
-    ICodeCounterRepository codeCounterRepo
+    ICodeCounterRepository codeCounterRepo,
+    ITenantContext? tenantContext = null
 ) : IBudgetTemplateService
 {
     public async Task<(List<BudgetTemplateSummaryResponse> Items, int TotalCount)> GetAllAsync(
@@ -33,8 +34,10 @@ public class BudgetTemplateService(
     {
         List<long>? provinceFilter = null;
 
-        if (!await rbacService.HasGlobalAccessAsync(userId, ct))
-            provinceFilter = await userService.GetUserProvinceIdsAsync(userId, ct);
+        if (!await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
+            provinceFilter = tenantContext?.UserCompanyId.HasValue == true
+                ? await userService.GetUserProvinceIdsAsync(userId, tenantContext.UserCompanyId, ct)
+                : await userService.GetUserProvinceIdsAsync(userId, ct);
 
         var (items, total) = await budgetTemplateRepo.GetAllAsync(status, query, provinceFilter, ct);
 
@@ -60,8 +63,10 @@ public class BudgetTemplateService(
     {
         List<long>? provinceFilter = null;
 
-        if (!await rbacService.HasGlobalAccessAsync(userId, ct))
-            provinceFilter = await userService.GetUserProvinceIdsAsync(userId, ct);
+        if (!await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
+            provinceFilter = tenantContext?.UserCompanyId.HasValue == true
+                ? await userService.GetUserProvinceIdsAsync(userId, tenantContext.UserCompanyId, ct)
+                : await userService.GetUserProvinceIdsAsync(userId, ct);
 
         await foreach (
             var item in budgetTemplateRepo.StreamAllAsync(

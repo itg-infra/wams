@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using WAMS.Api.Controllers.Companies;
 using WAMS.Application.Export;
+using WAMS.Application.DTOs.Users;
 using WAMS.Application.Interfaces.Companies;
+using WAMS.Application.Interfaces.Users;
 using Xunit;
 
 public class CompaniesControllerTests
@@ -16,12 +18,13 @@ public class CompaniesControllerTests
     private readonly ICompanyService _companyService = Substitute.For<ICompanyService>();
     private readonly IExportService _exportService = Substitute.For<IExportService>();
     private readonly IOptions<ExportOptions> _exportOptions = Substitute.For<IOptions<ExportOptions>>();
+    private readonly IUserCompanyService _userCompanyService = Substitute.For<IUserCompanyService>();
     private readonly CompaniesController _sut;
 
     public CompaniesControllerTests()
     {
         _exportOptions.Value.Returns(new ExportOptions { MaxRows = 1000 });
-        _sut = new CompaniesController(_companyService, _exportService, _exportOptions);
+        _sut = new CompaniesController(_companyService, _exportService, _exportOptions, userCompanyService: _userCompanyService);
         _sut.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -103,5 +106,49 @@ public class CompaniesControllerTests
         var fileResult = result.Should().BeOfType<FileStreamResult>().Subject;
         fileResult.ContentType.Should().Be("image/png");
         await _companyService.Received(1).GetLogoAsync(1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoveUser_DelegatesToMembershipServiceForCompanyAdministrator()
+    {
+        _sut.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub, "9"),
+            new Claim("company_id", "20"),
+            new Claim(ClaimTypes.Role, "COMPANY_ADMIN")
+        ], "jwt"));
+
+        var result = await _sut.RemoveUser(20, 4, TestContext.Current.CancellationToken);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _userCompanyService.Received(1).RemoveMembershipAsync(4, 20, 9, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task AssignUser_ForwardsSelectedSafeAssignmentsToMembershipService()
+    {
+        _sut.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub, "9"),
+            new Claim("company_id", "10"),
+            new Claim(ClaimTypes.Role, "SUPER_ADMIN")
+        ], "jwt"));
+        var request = new AddUserCompanyRequest(
+            RoleIds: [2, 4],
+            WarehouseIds: [99],
+            PrimaryWarehouseId: 99,
+            ProvinceIds: [11, 12]);
+
+        var result = await _sut.AssignUser(20, 4, request, TestContext.Current.CancellationToken);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _userCompanyService.Received(1).AddMembershipAsync(
+            4,
+            20,
+            9,
+            Arg.Is<AddUserCompanyRequest>(forwarded =>
+                forwarded.RoleIds!.SequenceEqual(new long[] { 2, 4 }) &&
+                forwarded.ProvinceIds!.SequenceEqual(new long[] { 11, 12 }) &&
+                forwarded.WarehouseIds == null &&
+                forwarded.PrimaryWarehouseId == null),
+            TestContext.Current.CancellationToken);
     }
 }

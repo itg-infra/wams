@@ -213,6 +213,59 @@ public class RbacRepository : IRbacRepository
         return new UserRbacSnapshot(roleKeys, overrides, hasGlobal);
     }
 
+    public async Task<UserRbacSnapshot> GetUserRbacSnapshotAsync(
+        long userId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        if (!userCompanyId.HasValue)
+        {
+            var systemRoles = await _db.UserRoles
+                .Where(ur => ur.UserId == userId && ur.Role.CompanyId == null)
+                .SelectMany(ur => ur.Role.RolePermissions.Select(rp => new
+                {
+                    Key = $"{rp.Permission.Module}.{rp.Permission.Resource}.{rp.Permission.Action}",
+                    ur.Role.GlobalAccess
+                }))
+                .ToListAsync(ct);
+
+            return new UserRbacSnapshot(
+                systemRoles.Select(x => x.Key).ToHashSet(StringComparer.Ordinal),
+                [],
+                systemRoles.Any(x => x.GlobalAccess));
+        }
+
+        var now = DateTime.UtcNow;
+        var roles = await _db.UserCompanyRoles
+            .Where(ucr => ucr.UserCompanyId == userCompanyId &&
+                         ucr.UserCompany.UserId == userId &&
+                         ucr.UserCompany.RemovedAt == null &&
+                         (ucr.ExpiresAt == null || ucr.ExpiresAt > now))
+            .SelectMany(ucr => ucr.Role.RolePermissions.Select(rp => new
+            {
+                Key = $"{rp.Permission.Module}.{rp.Permission.Resource}.{rp.Permission.Action}",
+                ucr.Role.GlobalAccess
+            }))
+            .ToListAsync(ct);
+
+        var overrides = await _db.UserCompanyPermissions
+            .Where(ucp => ucp.UserCompanyId == userCompanyId &&
+                         ucp.UserCompany.UserId == userId &&
+                         ucp.UserCompany.RemovedAt == null &&
+                         (ucp.ExpiresAt == null || ucp.ExpiresAt > DateTime.UtcNow))
+            .Select(ucp => new UserPermissionOverrideKey(
+                ucp.Permission.Module,
+                ucp.Permission.Resource,
+                ucp.Permission.Action,
+                ucp.IsGranted))
+            .ToListAsync(ct);
+
+        return new UserRbacSnapshot(
+            roles.Select(x => x.Key).ToHashSet(StringComparer.Ordinal),
+            overrides,
+            roles.Any(x => x.GlobalAccess));
+    }
+
     public async Task<List<string>> GetUserPermissionKeysAsync(
         long userId,
         long? companyId,

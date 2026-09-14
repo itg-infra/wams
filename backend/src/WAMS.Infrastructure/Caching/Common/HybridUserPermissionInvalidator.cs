@@ -7,4 +7,7 @@ public sealed class HybridUserPermissionInvalidator(HybridCache cache) : IUserPe
 {
     public Task InvalidateAsync(long userId, CancellationToken ct = default)
         => cache.RemoveByTagAsync(CacheTags.RbacUser(userId), ct).AsTask();
+
+    public Task InvalidateMembershipAsync(long userCompanyId, CancellationToken ct = default)
+        => cache.RemoveByTagAsync(CacheTags.RbacMembership(userCompanyId), ct).AsTask();
 }

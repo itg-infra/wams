@@ -92,6 +92,22 @@ var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
 await using var db = new AppDbContext(dbOptions);
 await db.Database.MigrateAsync();
 
+var reconciliation = await new UserCompanyMembershipReconciler(db).ReconcileAsync();
+if (!reconciliation.IsHealthy)
+{
+    logger.LogCritical(
+        "SAFETY LOCK: User-company membership reconciliation failed: {@Reconciliation}",
+        reconciliation);
+    Environment.ExitCode = 1;
+    return;
+}
+
+if (configuration.GetValue<bool>("E2E:ReconcileOnly"))
+{
+    logger.LogInformation("E2E: Reconciliation-only verification passed; reset was not requested.");
+    return;
+}
+
 // Layer 5: User count - prod/staging DBs have many users; test DB has few.
 var userCount = await db.Users.IgnoreQueryFilters().CountAsync();
 var maxUsers = configuration.GetValue("E2E:MaxUserCount", 10);

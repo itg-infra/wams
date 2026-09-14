@@ -164,7 +164,7 @@ public class BudgetPlanReminderBackgroundService(
             var anyStage = group.First().Stage!;
             var approverRoles = new HashSet<string>(anyStage.ApproverRoles, StringComparer.OrdinalIgnoreCase);
 
-            var approvers = await userRepo.GetUsersByRolesAndWarehouseAsync(
+            var approvers = await userRepo.GetUsersByRolesAndWarehouseForCompanyAsync(
                 group.Key.CompanyId, group.Key.WarehouseShadowId, approverRoles, ct);
 
             if (approvers.Count == 0)

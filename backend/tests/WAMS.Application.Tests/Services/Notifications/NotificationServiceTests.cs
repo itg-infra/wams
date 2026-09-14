@@ -76,6 +76,19 @@ public class NotificationServiceTests
     }
 
     [Fact]
+    public async Task PublishAsync_DoesNotMergeEquivalentNotificationsAcrossCompanies()
+    {
+        await _sut.PublishAsync([
+            new NotificationCreateRequest(1, 10, 99, "approval_completed", "Approved", "Done", "budget_plan", "123"),
+            new NotificationCreateRequest(2, 10, 99, "approval_completed", "Approved", "Done", "budget_plan", "123")
+        ], TestContext.Current.CancellationToken);
+
+        await _notificationRepo.Received(1).CreateRangeAsync(
+            Arg.Is<IEnumerable<Notification>>(items => items.Count() == 2 && items.Select(n => n.CompanyId).Order().SequenceEqual(new long[] { 1L, 2L })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PublishAsync_WhenRealtimeDispatchFails_DoesNotThrow()
     {
         _dispatcher.PublishAsync(Arg.Any<NotificationResponse>(), Arg.Any<CancellationToken>())

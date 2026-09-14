@@ -17,4 +17,5 @@ public class Permission : BaseEntity
 
     public ICollection<RolePermission> RolePermissions { get; set; } = [];
     public ICollection<UserPermission> UserPermissions { get; set; } = [];
+    public ICollection<UserCompanyPermission> UserCompanyPermissions { get; set; } = [];
 }

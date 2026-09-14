@@ -66,7 +66,10 @@ public class AuthService : IAuthService
         CancellationToken ct = default
     )
     {
-        var user = await _userRepo.GetByEmailWithRolesAsync(request.Email.ToLowerInvariant(), ct)
+        var normalizedEmail = request.Email.ToLowerInvariant();
+        var loginIdentity = await _userRepo.GetLoginIdentityAsync(normalizedEmail, request.CompanyId, ct);
+        var user = loginIdentity?.User
+            ?? await _userRepo.GetByEmailWithRolesAsync(normalizedEmail, ct)
             ?? throw new UnauthorizedException(ErrorMessages.Auth.InvalidCredentials);
 
         if (!user.IsActive)
@@ -79,6 +82,11 @@ public class AuthService : IAuthService
         }
 
         var hasWildcard = user.UserRoles.Any(ur => ur.Role.RolePermissions.Any(rp => rp.Permission?.FullKey == "*.*.*"));
+        // A system-wide identity, such as SUPER_ADMIN, may have a migrated membership row
+        // for compatibility, but its authorization remains global and its token must not carry
+        // a membership claim. Membership claims are only for company-scoped identities.
+        var membershipAwareLogin = loginIdentity.HasValue && !hasWildcard;
+        var membership = membershipAwareLogin ? loginIdentity?.Membership : null;
 
         long actingCompanyId;
         if (hasWildcard)
@@ -90,13 +98,33 @@ public class AuthService : IAuthService
         }
         else
         {
-            if (request.CompanyId != user.CompanyId)
+            if (membershipAwareLogin && membership is null)
+                throw new UnauthorizedException(ErrorMessages.Auth.InvalidCredentials);
+
+            if (membershipAwareLogin && membership?.Company is { IsActive: false })
+                throw new UnauthorizedException(ErrorMessages.Auth.InvalidCredentials);
+
+            if (!membershipAwareLogin && request.CompanyId != user.CompanyId)
                 throw new UnauthorizedException(ErrorMessages.Auth.InvalidCredentials);
             actingCompanyId = user.CompanyId;
+            if (membershipAwareLogin)
+                actingCompanyId = request.CompanyId;
         }
 
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
-        var accessToken = _tokenService.GenerateAccessToken(user, roles, actingCompanyId, hasWildcard);
+        var roles = membershipAwareLogin && membership is not null
+            ? membership.Roles.Where(ur => ur.ExpiresAt is null || ur.ExpiresAt > DateTime.UtcNow).Select(ur => ur.Role.Name).ToList()
+            : user.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var accessToken = membershipAwareLogin
+            ? _tokenService.GenerateAccessToken(
+                user,
+                roles,
+                actingCompanyId,
+                membership?.Id,
+                membership?.AuthorizationVersion,
+                hasWildcard)
+            : loginIdentity.HasValue
+                ? _tokenService.GenerateAccessToken(user, roles, actingCompanyId, null, null, hasWildcard)
+                : _tokenService.GenerateAccessToken(user, roles, actingCompanyId, hasWildcard);
         var refreshToken = _tokenService.GenerateRefreshToken();
         var tokenHash = HashToken(refreshToken);
 
@@ -104,6 +132,8 @@ public class AuthService : IAuthService
         {
             UserId = user.Id,
             CompanyId = actingCompanyId,
+            UserCompanyId = membershipAwareLogin ? membership?.Id : null,
+            MembershipAuthorizationVersion = membershipAwareLogin ? membership?.AuthorizationVersion : null,
             TokenHash = tokenHash,
             IpAddress = ipAddress,
             DeviceInfo = deviceInfo,
@@ -149,13 +179,44 @@ public class AuthService : IAuthService
         if (storedToken.CompanyId <= 0)
             throw new UnauthorizedException(ErrorMessages.Auth.InvalidRefreshToken);
 
-        // Token rotation: revoke old token
-        await _authRepo.RevokeRefreshTokenAsync(storedToken.Id, ct);
+        if (!storedToken.User.IsActive)
+            throw new UnauthorizedException(ErrorMessages.Auth.InvalidRefreshToken);
+
+        var actingCompany = await _companyRepo.GetByIdAsync(storedToken.CompanyId, ct);
+        if (actingCompany is null || !actingCompany.IsActive)
+            throw new UnauthorizedException(ErrorMessages.Auth.InvalidRefreshToken);
 
         var user = storedToken.User;
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
         var hasWildcard = user.UserRoles.Any(ur => ur.Role.RolePermissions.Any(rp => rp.Permission?.FullKey == "*.*.*"));
-        var accessToken = _tokenService.GenerateAccessToken(user, roles, storedToken.CompanyId, hasWildcard);
+        // Recover old tokens issued while a global user happened to have a migrated membership
+        // row. A global identity must always refresh back to a token without membership scope.
+        var membershipAwareRefresh = storedToken.UserCompanyId.HasValue && !hasWildcard;
+        var membership = membershipAwareRefresh
+            ? user.UserCompanies.FirstOrDefault(uc =>
+                uc.Id == storedToken.UserCompanyId &&
+                uc.CompanyId == storedToken.CompanyId &&
+                uc.RemovedAt == null &&
+                uc.AuthorizationVersion == storedToken.MembershipAuthorizationVersion)
+            : null;
+
+        if (membershipAwareRefresh && membership is null)
+            throw new UnauthorizedException(ErrorMessages.Auth.InvalidRefreshToken);
+
+        // Token rotation: revoke old token only after the membership state is validated.
+        await _authRepo.RevokeRefreshTokenAsync(storedToken.Id, ct);
+
+        var roles = membershipAwareRefresh
+            ? membership!.Roles.Where(ucr => ucr.ExpiresAt is null || ucr.ExpiresAt > DateTime.UtcNow).Select(ucr => ucr.Role.Name).ToList()
+            : user.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var accessToken = membershipAwareRefresh
+            ? _tokenService.GenerateAccessToken(
+                user,
+                roles,
+                storedToken.CompanyId,
+                membership!.Id,
+                membership.AuthorizationVersion,
+                hasWildcard)
+            : _tokenService.GenerateAccessToken(user, roles, storedToken.CompanyId, hasWildcard);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
         var newTokenHash = HashToken(newRefreshToken);
 
@@ -163,6 +224,8 @@ public class AuthService : IAuthService
         {
             UserId = user.Id,
             CompanyId = storedToken.CompanyId,
+            UserCompanyId = membershipAwareRefresh ? membership!.Id : null,
+            MembershipAuthorizationVersion = membershipAwareRefresh ? membership!.AuthorizationVersion : null,
             TokenHash = newTokenHash,
             IpAddress = storedToken.IpAddress,
             DeviceInfo = storedToken.DeviceInfo,
@@ -272,24 +335,56 @@ public class AuthService : IAuthService
         var user = await _userRepo.GetByIdUnfilteredReadOnlyAsync(userId, ct)
             ?? throw new NotFoundException(ErrorMessages.User.NotFound(userId));
 
-        var permissions = await _rbacRepo.GetUserPermissionKeysAsync(userId, ct);
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var hasWildcard = user.UserRoles.Any(ur => ur.Role.RolePermissions.Any(rp => rp.Permission?.FullKey == "*.*.*"));
+        var membership = !hasWildcard && _tenantContext.UserCompanyId.HasValue
+            ? user.UserCompanies.FirstOrDefault(uc => uc.Id == _tenantContext.UserCompanyId && uc.RemovedAt == null)
+            : null;
+        var permissions = membership is null
+            ? await _rbacRepo.GetUserPermissionKeysAsync(userId, ct)
+            : BuildMembershipPermissionKeys(await _rbacRepo.GetUserRbacSnapshotAsync(userId, membership.Id, ct));
+        var roles = membership is null
+            ? user.UserRoles.Select(ur => ur.Role.Name).ToList()
+            : membership.Roles.Where(ur => ur.ExpiresAt is null || ur.ExpiresAt > DateTime.UtcNow).Select(ur => ur.Role.Name).ToList();
         var hasGlobalAccess = user.UserRoles.Any(ur => ur.Role.GlobalAccess);
         var permissionMap = BuildPermissionMap(permissions);
-        var warehouses = user.UserWarehouses
+        var warehouses = (membership?.Warehouses.Select(uw => new
+            {
+                Id = uw.Warehouse.Id,
+                Code = uw.Warehouse.Code,
+                Name = uw.Warehouse.Name,
+                Location = uw.Warehouse.Location,
+                IsPrimary = uw.IsPrimary
+            }) ?? user.UserWarehouses.Select(uw => new
+            {
+                Id = uw.Warehouse.Id,
+                Code = uw.Warehouse.Code,
+                Name = uw.Warehouse.Name,
+                Location = uw.Warehouse.Location,
+                IsPrimary = uw.IsPrimary
+            }))
             .OrderByDescending(uw => uw.IsPrimary)
             .Select(uw => new MeWarehouseResponse(
-                uw.Warehouse.Id,
-                uw.Warehouse.Code,
-                uw.Warehouse.Name,
-                uw.Warehouse.Location,
+                uw.Id,
+                uw.Code,
+                uw.Name,
+                uw.Location,
                 uw.IsPrimary))
             .ToList();
-        var provinces = user.UserProvinces
+        var provinces = (membership?.Provinces.Select(up => new
+            {
+                Id = up.Province.Id,
+                Name = up.Province.Name,
+                Display = up.Province.Display
+            }) ?? user.UserProvinces.Select(up => new
+            {
+                Id = up.Province.Id,
+                Name = up.Province.Name,
+                Display = up.Province.Display
+            }))
             .Select(up => new MeProvinceResponse(
-                up.Province.Id,
-                up.Province.Name,
-                up.Province.Display))
+                up.Id,
+                up.Name,
+                up.Display))
             .OrderBy(p => p.Display)
             .ToList();
 
@@ -316,8 +411,21 @@ public class AuthService : IAuthService
             warehouses,
             provinces,
             user.CreatedAt,
-            user.EmployeeId
+            user.EmployeeId,
+            membership?.Id
         );
+    }
+
+    private static List<string> BuildMembershipPermissionKeys(UserRbacSnapshot snapshot)
+    {
+        var keys = snapshot.RolePermissionKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var overrideKey in snapshot.ActiveOverrides)
+        {
+            var key = $"{overrideKey.Module}.{overrideKey.Resource}.{overrideKey.Action}";
+            if (overrideKey.IsGranted) keys.Add(key);
+            else keys.Remove(key);
+        }
+        return [.. keys];
     }
 
     private static Dictionary<string, Dictionary<string, List<string>>> BuildPermissionMap(List<string> permissions)

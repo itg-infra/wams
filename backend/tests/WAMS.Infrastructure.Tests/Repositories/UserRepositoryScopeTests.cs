@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using WAMS.Application.Common;
 using WAMS.Application.Interfaces.Common;
 using WAMS.Domain.Constants;
 using WAMS.Domain.Entities.Common;
@@ -229,5 +230,50 @@ public class UserRepositoryScopeTests
         currentUser.Should().NotBeNull();
         currentUser!.Company.Code.Should().Be("GCU");
         currentUser.UserRoles.Should().ContainSingle(ur => ur.Role.Name == RoleCodes.SuperAdmin);
+    }
+
+    [Fact]
+    public async Task UserListAndDetail_StartFromLiveMembershipsInActingCompany()
+    {
+        var o = NewDb();
+        await using (var seedDb = Open(o))
+        {
+            var homeCompany = new Company { Id = 1, Name = "Home", Code = "HOME", IsActive = true };
+            var actingCompany = new Company { Id = 2, Name = "Acting", Code = "ACT", IsActive = true };
+            var user = new User
+            {
+                Id = 40,
+                Email = "secondary@example.com",
+                Fullname = "Secondary Company User",
+                CompanyId = homeCompany.Id,
+                Company = homeCompany,
+                IsActive = true
+            };
+            user.UserCompanies.Add(new UserCompany
+            {
+                UserId = user.Id,
+                CompanyId = actingCompany.Id,
+                User = user,
+                Company = actingCompany
+            });
+            seedDb.AddRange(homeCompany, actingCompany, user);
+            await seedDb.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var actingTenant = Substitute.For<ITenantContext>();
+        actingTenant.IsSet.Returns(true);
+        actingTenant.CompanyId.Returns(2L);
+        await using var db = new AppDbContext(o, actingTenant);
+        var repo = new UserRepository(db, actingTenant);
+
+        var (items, total) = await repo.GetAllAsync(
+            new DataTableQuery { Page = 1, Limit = 20 },
+            TestContext.Current.CancellationToken);
+        var detail = await repo.GetByIdAsync(40, TestContext.Current.CancellationToken);
+
+        total.Should().Be(1);
+        items.Should().ContainSingle(u => u.Id == 40);
+        detail.Should().NotBeNull();
+        detail!.Id.Should().Be(40);
     }
 }

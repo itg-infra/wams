@@ -25,7 +25,8 @@ public class PurchaseOrderService(
     IWarehouseShadowRepository warehouseRepo,
     IUserRepository userRepo,
     IRbacService rbacService,
-    ICodeCounterRepository codeCounterRepo
+    ICodeCounterRepository codeCounterRepo,
+    ITenantContext? tenantContext = null
 ) : IPurchaseOrderService
 {
     private const int MaxApdpErrorLength = 1000;
@@ -220,9 +221,9 @@ public class PurchaseOrderService(
 
         if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
-                return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+                return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
         }
 
         return null;
@@ -233,10 +234,10 @@ public class PurchaseOrderService(
         if (warehouseContext.IsSet && warehouseContext.WarehouseId.HasValue)
             await EnsureWarehouseAccessAsync(userId, warehouseContext.WarehouseId.Value, ct);
 
-        if (await rbacService.HasGlobalAccessAsync(userId, ct))
+        if (await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
             return null;
 
-        return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+        return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
     }
 
     private static DataTableQuery ToDataTableQuery(DataTableQuery query) => new()
@@ -263,9 +264,9 @@ public class PurchaseOrderService(
         _ = await warehouseRepo.GetByIdAsync(warehouseId, ct)
             ?? throw new NotFoundException(ErrorMessages.Warehouse.NotFound(warehouseId));
 
-        if (await rbacService.HasGlobalAccessAsync(userId, ct)) return;
+        if (await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct)) return;
 
-        var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
 
         if (!ids.Contains(warehouseId))
             throw new ForbiddenException(ErrorMessages.Warehouse.AccessDenied);

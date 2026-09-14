@@ -40,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
                 isLogoutLoading: false,
                 error: null,
                 errorCode: null,
+                userCompanyId: null,
 
                 hasRole: (role: string) => {
                     const user = get().user;
@@ -105,6 +106,7 @@ export const useAuthStore = create<AuthState>()(
                         set({
                             tokens: response.data,
                             user: me,
+                            userCompanyId: me.userCompanyId ?? null,
                             isAuthenticated: true,
                             isLoading: false,
                             error: null,
@@ -152,6 +154,7 @@ export const useAuthStore = create<AuthState>()(
                         set({
                             tokens: response.data,
                             user: me,
+                            userCompanyId: me.userCompanyId ?? null,
                             isAuthenticated: true,
                             isLoading: false,
                             error: null,
@@ -184,6 +187,7 @@ export const useAuthStore = create<AuthState>()(
                         clearTenantState();
                         set({
                             user: null,
+                            userCompanyId: null,
                             tokens: null,
                             isAuthenticated: false,
                             isLoading: false,
@@ -197,7 +201,7 @@ export const useAuthStore = create<AuthState>()(
                 updateProfile: async (payload) => {
                     const response = await authService.updateProfile(payload);
                     if (!response.success || !response.data) throw new Error(response.message);
-                    set({ user: response.data });
+                    set({ user: response.data, userCompanyId: response.data.userCompanyId ?? null });
                 },
 
                 changePassword: async (payload) => {
@@ -205,7 +209,7 @@ export const useAuthStore = create<AuthState>()(
                     if (!response.success) throw new Error(response.message);
                     clearTokens();
                     clearTenantState();
-                    set({ user: null, tokens: null, isAuthenticated: false });
+                    set({ user: null, userCompanyId: null, tokens: null, isAuthenticated: false });
                 },
 
                 clearError: () => set({ error: null, errorCode: null }),
@@ -214,6 +218,7 @@ export const useAuthStore = create<AuthState>()(
                 name: "auth-storage",
                 partialize: (state) => ({
                     user: state.user,
+                    userCompanyId: state.userCompanyId,
                     tokens: state.tokens,
                     isAuthenticated: state.isAuthenticated,
                 }),

@@ -476,6 +476,10 @@ namespace WAMS.Infrastructure.Migrations
                         .HasColumnType("character varying(45)")
                         .HasColumnName("ip_address");
 
+                    b.Property<int?>("MembershipAuthorizationVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("membership_authorization_version");
+
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
@@ -490,6 +494,10 @@ namespace WAMS.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<long?>("UserCompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_company_id");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
@@ -502,6 +510,9 @@ namespace WAMS.Infrastructure.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("idx_refresh_tokens_user_id");
+
+                    b.HasIndex("UserCompanyId", "RevokedAt")
+                        .HasDatabaseName("idx_refresh_tokens_user_company_revoked");
 
                     b.ToTable("refresh_tokens", (string)null);
                 });
@@ -1889,6 +1900,56 @@ namespace WAMS.Infrastructure.Migrations
                     b.ToTable("role_permissions", (string)null);
                 });
 
+            modelBuilder.Entity("WAMS.Domain.Entities.Roles.UserCompanyPermission", b =>
+                {
+                    b.Property<long>("UserCompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_company_id");
+
+                    b.Property<long>("PermissionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("permission_id");
+
+                    b.Property<string>("Constraints")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("constraints");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<long>("GrantedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("granted_by");
+
+                    b.Property<bool>("IsGranted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_granted");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("UserCompanyId", "PermissionId");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_user_company_permissions_expires_at");
+
+                    b.HasIndex("GrantedBy");
+
+                    b.HasIndex("PermissionId");
+
+                    b.HasIndex("UserCompanyId", "IsGranted")
+                        .HasDatabaseName("idx_user_company_permissions_membership_granted");
+
+                    b.ToTable("user_company_permissions", (string)null);
+                });
+
             modelBuilder.Entity("WAMS.Domain.Entities.Roles.UserPermission", b =>
                 {
                     b.Property<long>("UserId")
@@ -2501,6 +2562,124 @@ namespace WAMS.Infrastructure.Migrations
                         .HasFilter("\"is_active\" = true AND \"deleted_at\" IS NULL");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompany", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AuthorizationVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("authorization_version");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_at");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("UserId", "CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_user_companies_user_company_live")
+                        .HasFilter("removed_at IS NULL");
+
+                    b.ToTable("user_companies", (string)null);
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyProvince", b =>
+                {
+                    b.Property<long>("UserCompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_company_id");
+
+                    b.Property<long>("ProvinceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("province_id");
+
+                    b.HasKey("UserCompanyId", "ProvinceId");
+
+                    b.HasIndex("ProvinceId");
+
+                    b.ToTable("user_company_provinces", (string)null);
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyRole", b =>
+                {
+                    b.Property<long>("UserCompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_company_id");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("UserCompanyId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("user_company_roles", (string)null);
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyWarehouse", b =>
+                {
+                    b.Property<long>("UserCompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_company_id");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_primary");
+
+                    b.HasKey("UserCompanyId", "WarehouseId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("UserCompanyId", "IsPrimary")
+                        .IsUnique()
+                        .HasDatabaseName("idx_user_company_warehouses_primary")
+                        .HasFilter("is_primary = true");
+
+                    b.ToTable("user_company_warehouses", (string)null);
                 });
 
             modelBuilder.Entity("WAMS.Domain.Entities.Users.UserProvince", b =>
@@ -3751,6 +3930,11 @@ namespace WAMS.Infrastructure.Migrations
 
             modelBuilder.Entity("WAMS.Domain.Entities.Auth.RefreshToken", b =>
                 {
+                    b.HasOne("WAMS.Domain.Entities.Users.UserCompany", "UserCompany")
+                        .WithMany()
+                        .HasForeignKey("UserCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WAMS.Domain.Entities.Users.User", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
@@ -3758,6 +3942,8 @@ namespace WAMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+
+                    b.Navigation("UserCompany");
                 });
 
             modelBuilder.Entity("WAMS.Domain.Entities.BudgetPlans.BudgetPlan", b =>
@@ -4158,6 +4344,33 @@ namespace WAMS.Infrastructure.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("WAMS.Domain.Entities.Roles.UserCompanyPermission", b =>
+                {
+                    b.HasOne("WAMS.Domain.Entities.Users.User", "GrantedByUser")
+                        .WithMany()
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Roles.Permission", "Permission")
+                        .WithMany("UserCompanyPermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Users.UserCompany", "UserCompany")
+                        .WithMany("Permissions")
+                        .HasForeignKey("UserCompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GrantedByUser");
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("UserCompany");
+                });
+
             modelBuilder.Entity("WAMS.Domain.Entities.Roles.UserPermission", b =>
                 {
                     b.HasOne("WAMS.Domain.Entities.Users.User", "GrantedByUser")
@@ -4235,6 +4448,82 @@ namespace WAMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompany", b =>
+                {
+                    b.HasOne("WAMS.Domain.Entities.Companies.Company", "Company")
+                        .WithMany("UserCompanies")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Users.User", "User")
+                        .WithMany("UserCompanies")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyProvince", b =>
+                {
+                    b.HasOne("WAMS.Domain.Entities.Common.Province", "Province")
+                        .WithMany()
+                        .HasForeignKey("ProvinceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Users.UserCompany", "UserCompany")
+                        .WithMany("Provinces")
+                        .HasForeignKey("UserCompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Province");
+
+                    b.Navigation("UserCompany");
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyRole", b =>
+                {
+                    b.HasOne("WAMS.Domain.Entities.Roles.Role", "Role")
+                        .WithMany("UserCompanyRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Users.UserCompany", "UserCompany")
+                        .WithMany("Roles")
+                        .HasForeignKey("UserCompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("UserCompany");
+                });
+
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompanyWarehouse", b =>
+                {
+                    b.HasOne("WAMS.Domain.Entities.Users.UserCompany", "UserCompany")
+                        .WithMany("Warehouses")
+                        .HasForeignKey("UserCompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WAMS.Domain.Entities.Warehouses.WarehouseShadow", "Warehouse")
+                        .WithMany("UserCompanyWarehouses")
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserCompany");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("WAMS.Domain.Entities.Users.UserProvince", b =>
@@ -4625,6 +4914,8 @@ namespace WAMS.Infrastructure.Migrations
 
             modelBuilder.Entity("WAMS.Domain.Entities.Companies.Company", b =>
                 {
+                    b.Navigation("UserCompanies");
+
                     b.Navigation("Users");
 
                     b.Navigation("Warehouses");
@@ -4644,12 +4935,16 @@ namespace WAMS.Infrastructure.Migrations
                 {
                     b.Navigation("RolePermissions");
 
+                    b.Navigation("UserCompanyPermissions");
+
                     b.Navigation("UserPermissions");
                 });
 
             modelBuilder.Entity("WAMS.Domain.Entities.Roles.Role", b =>
                 {
                     b.Navigation("RolePermissions");
+
+                    b.Navigation("UserCompanyRoles");
 
                     b.Navigation("UserRoles");
                 });
@@ -4663,6 +4958,8 @@ namespace WAMS.Infrastructure.Migrations
                 {
                     b.Navigation("RefreshTokens");
 
+                    b.Navigation("UserCompanies");
+
                     b.Navigation("UserPermissions");
 
                     b.Navigation("UserProvinces");
@@ -4672,8 +4969,21 @@ namespace WAMS.Infrastructure.Migrations
                     b.Navigation("UserWarehouses");
                 });
 
+            modelBuilder.Entity("WAMS.Domain.Entities.Users.UserCompany", b =>
+                {
+                    b.Navigation("Permissions");
+
+                    b.Navigation("Provinces");
+
+                    b.Navigation("Roles");
+
+                    b.Navigation("Warehouses");
+                });
+
             modelBuilder.Entity("WAMS.Domain.Entities.Warehouses.WarehouseShadow", b =>
                 {
+                    b.Navigation("UserCompanyWarehouses");
+
                     b.Navigation("UserWarehouses");
                 });
 

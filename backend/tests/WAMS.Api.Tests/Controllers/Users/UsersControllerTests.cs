@@ -16,12 +16,14 @@ using WAMS.Application.DTOs.Users;
 using WAMS.Application.Export;
 using WAMS.Application.Interfaces.Rbac;
 using WAMS.Application.Interfaces.Users;
+using WAMS.Domain.Constants;
 using Xunit;
 
 public class UsersControllerTests
 {
     private readonly IUserService _userSvc = Substitute.For<IUserService>();
     private readonly IRbacService _rbacSvc = Substitute.For<IRbacService>();
+    private readonly IUserCompanyService _userCompanySvc = Substitute.For<IUserCompanyService>();
     private readonly IValidator<CreateUserRequest> _validator = Substitute.For<IValidator<CreateUserRequest>>();
     private readonly IValidator<ResetPasswordRequest> _resetPasswordValidator = Substitute.For<IValidator<ResetPasswordRequest>>();
     private readonly IExportService _exportService = Substitute.For<IExportService>();
@@ -30,7 +32,7 @@ public class UsersControllerTests
 
     public UsersControllerTests()
     {
-        _sut = new UsersController(_userSvc, _rbacSvc, _validator, _resetPasswordValidator, _exportService, _exportOptions);
+        _sut = new UsersController(_userSvc, _rbacSvc, _validator, _resetPasswordValidator, _exportService, _exportOptions, _userCompanySvc);
         _sut.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = BuildUser(1) }
@@ -159,5 +161,21 @@ public class UsersControllerTests
 
         result.Should().BeOfType<OkObjectResult>();
         await _userSvc.Received(1).RemoveRoleAsync(1, 5, 1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SuperAdminWithCompanyClaim_UsesMembershipMutationRouteWithoutMembershipClaim()
+    {
+        _sut.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(JwtRegisteredClaimNames.Sub, "9"),
+            new Claim("company_id", "20"),
+            new Claim(ClaimTypes.Role, RoleCodes.SuperAdmin)
+        ], authenticationType: "jwt"));
+
+        var result = await _sut.AssignRole(id: 5, roleId: 7);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _userCompanySvc.Received(1).AssignRoleAsync(5, 20, 7, 9, Arg.Any<CancellationToken>());
+        await _userSvc.DidNotReceive().AssignRoleAsync(Arg.Any<long>(), Arg.Any<AssignRoleRequest>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
 }

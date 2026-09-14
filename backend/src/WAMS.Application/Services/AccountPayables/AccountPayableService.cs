@@ -25,7 +25,8 @@ public class AccountPayableService(
     IWarehouseShadowRepository warehouseRepo,
     IUserRepository userRepo,
     IRbacService rbacService,
-    ICodeCounterRepository codeCounterRepo
+    ICodeCounterRepository codeCounterRepo,
+    ITenantContext? tenantContext = null
 ) : IAccountPayableService
 {
     public Task<(List<AccountPayableSummaryResponse> Items, int TotalCount)> GetAllAsync(
@@ -100,9 +101,9 @@ public class AccountPayableService(
 
         if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
-                return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+                return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
         }
 
         return null;
@@ -495,9 +496,9 @@ public class AccountPayableService(
         _ = await warehouseRepo.GetByIdAsync(warehouseId, ct)
             ?? throw new NotFoundException(ErrorMessages.Warehouse.NotFound(warehouseId));
 
-        if (await rbacService.HasGlobalAccessAsync(userId, ct)) return;
+        if (await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct)) return;
 
-        var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
 
         if (!ids.Contains(warehouseId))
             throw new ForbiddenException(ErrorMessages.Warehouse.AccessDenied);

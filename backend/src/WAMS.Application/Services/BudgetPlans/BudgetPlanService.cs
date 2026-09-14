@@ -74,9 +74,9 @@ public class BudgetPlanService(
         }
         else if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
-                warehouseIds = (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+                warehouseIds = (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
         }
 
         var (data, total) = await budgetPlanRepo.GetAllSummaryAsync(status, query, warehouseIds, ct);
@@ -101,8 +101,8 @@ public class BudgetPlanService(
         }
         else if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
-            if (!hasGlobal) warehouseIds = [.. await userRepo.GetUserWarehouseIdsAsync(userId, ct)];
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
+            if (!hasGlobal) warehouseIds = [.. await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)];
         }
 
         await foreach (
@@ -478,7 +478,7 @@ public class BudgetPlanService(
             .FirstOrDefault(s => s.Status == WorkflowStageStatus.Pending)
             ?? throw new ValidationException(ErrorMessages.BudgetPlan.NoPendingApprovalStage);
 
-        var hasGlobalAccess = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobalAccess = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
         var isAuthorized = hasGlobalAccess || currentStage.ApproverRoles
             .Any(r => userRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
 
@@ -693,11 +693,11 @@ public class BudgetPlanService(
     // regardless of what's currently selected elsewhere in the UI.
     private async Task<IReadOnlyList<string>?> ResolveSpkWhsCodesAsync(long userId, CancellationToken ct)
     {
-        var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
         if (hasGlobal)
             return null;
 
-        var warehouseIds = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var warehouseIds = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
         return await warehouseRepo.GetCodesByIdsAsync(warehouseIds, ct);
     }
 
@@ -1094,11 +1094,17 @@ public class BudgetPlanService(
 
             if (nextStage is not null)
             {
-                var nextApprovers = await userRepo.GetUsersByRolesAndWarehouseAsync(
-                    plan.CompanyId,
-                    plan.WarehouseShadowId,
-                    new HashSet<string>(nextStage.ApproverRoles, StringComparer.OrdinalIgnoreCase),
-                    ct);
+                var nextApprovers = tenantContext.UserCompanyId.HasValue
+                    ? await userRepo.GetUsersByRolesAndWarehouseForCompanyAsync(
+                        plan.CompanyId,
+                        plan.WarehouseShadowId,
+                        new HashSet<string>(nextStage.ApproverRoles, StringComparer.OrdinalIgnoreCase),
+                        ct)
+                    : await userRepo.GetUsersByRolesAndWarehouseAsync(
+                        plan.CompanyId,
+                        plan.WarehouseShadowId,
+                        new HashSet<string>(nextStage.ApproverRoles, StringComparer.OrdinalIgnoreCase),
+                        ct);
 
                 notifications.AddRange(nextApprovers
                     .Where(u => u.Id != actorUserId)

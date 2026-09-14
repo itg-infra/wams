@@ -3,6 +3,7 @@ namespace WAMS.Application.Interfaces.Common;
 public interface ITenantContext
 {
     long? CompanyId { get; }
+    long? UserCompanyId { get; }
 
     /// <summary>
     /// True when the context has been explicitly set by the middleware.
@@ -10,4 +11,5 @@ public interface ITenantContext
     bool IsSet { get; }
 
     void SetCompanyId(long companyId);
+    void SetMembership(long userCompanyId);
 }

@@ -2,6 +2,7 @@ namespace WAMS.Domain.Entities.Roles;
 
 using WAMS.Domain.Common;
 using WAMS.Domain.Entities.Companies;
+using WAMS.Domain.Entities.Users;
 
 public class Role : BaseEntity
 {
@@ -15,5 +16,6 @@ public class Role : BaseEntity
     public bool GlobalAccess { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = [];
+    public ICollection<UserCompanyRole> UserCompanyRoles { get; set; } = [];
     public ICollection<RolePermission> RolePermissions { get; set; } = [];
 }

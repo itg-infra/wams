@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using WAMS.Api.Filters;
 using WAMS.Application.DTOs.Common;
 using WAMS.Application.DTOs.Companies;
+using WAMS.Application.DTOs.Users;
 using WAMS.Application.Export;
 using WAMS.Application.Export.Definitions;
 using WAMS.Application.Interfaces.Companies;
@@ -16,12 +17,18 @@ using WAMS.Domain.Constants;
 
 [ApiController]
 [Route("api/v1/companies")]
-public class CompaniesController(ICompanyService companyService, IExportService exportService, IOptions<ExportOptions> exportOptions, IUserService? userService = null) : BaseController
+public class CompaniesController(
+    ICompanyService companyService,
+    IExportService exportService,
+    IOptions<ExportOptions> exportOptions,
+    IUserService? userService = null,
+    IUserCompanyService? userCompanyService = null) : BaseController
 {
     private readonly ICompanyService _companyService = companyService;
     private readonly IExportService _exportService = exportService;
     private readonly IOptions<ExportOptions> _exportOptions = exportOptions;
     private readonly IUserService? _userService = userService;
+    private readonly IUserCompanyService? _userCompanyService = userCompanyService;
 
     /// <summary>Exports companies to a file in the requested format.</summary>
     [HttpGet("export")]
@@ -133,16 +140,49 @@ public class CompaniesController(ICompanyService companyService, IExportService 
     }
 
     /// <summary>
-    /// Move a user to a different company. Clears their warehouse assignments.
+    /// Add an existing identity to a company without changing its other memberships.
     /// </summary>
     [HttpPost("{companyId:long}/users/{userId:long}")]
     [RequirePermission(Permissions.System.CompanyAssign)]
-    public async Task<IActionResult> AssignUser(long companyId, long userId, CancellationToken ct)
+    public async Task<IActionResult> AssignUser(
+        long companyId,
+        long userId,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)]
+        AddUserCompanyRequest? request = null,
+        CancellationToken ct = default)
     {
-        if (_userService is not null)
-            await _userService.EnsureCanMutateAsync(GetUserId(), userId);
-        await _companyService.AssignUserToCompanyAsync(userId, companyId, ct);
+        if (_userCompanyService is not null)
+        {
+            if (User.FindFirst("company_id") is not null && !User.IsInRole(RoleCodes.SuperAdmin) && GetCompanyId() != companyId)
+                throw new WAMS.Domain.Exceptions.ForbiddenException("A company administrator can only manage memberships in the acting company");
+            var safeRequest = request is null
+                ? null
+                : new AddUserCompanyRequest(
+                    RoleIds: request.RoleIds,
+                    ProvinceIds: request.ProvinceIds);
+            await _userCompanyService.AddMembershipAsync(userId, companyId, GetUserId(), safeRequest, ct);
+        }
+        else
+        {
+            if (_userService is not null)
+                await _userService.EnsureCanMutateAsync(GetUserId(), userId);
+            await _companyService.AssignUserToCompanyAsync(userId, companyId, ct);
+        }
 
+        return Ok(OkResponse(SuccessMessages.Company.UserAssigned));
+    }
+
+    /// <summary>Remove a user's membership while retaining the global identity.</summary>
+    [HttpDelete("{companyId:long}/users/{userId:long}")]
+    [RequirePermission(Permissions.User.Update)]
+    public async Task<IActionResult> RemoveUser(long companyId, long userId, CancellationToken ct)
+    {
+        if (_userCompanyService is null)
+            throw new NotSupportedException("Membership administration is not configured");
+        if (User.FindFirst("company_id") is not null && !User.IsInRole(RoleCodes.SuperAdmin) && GetCompanyId() != companyId)
+            throw new WAMS.Domain.Exceptions.ForbiddenException("A company administrator can only manage memberships in the acting company");
+
+        await _userCompanyService.RemoveMembershipAsync(userId, companyId, GetUserId(), ct);
         return Ok(OkResponse(SuccessMessages.Company.UserAssigned));
     }
 

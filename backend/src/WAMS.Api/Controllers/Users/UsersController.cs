@@ -26,7 +26,8 @@ public class UsersController(
     IValidator<CreateUserRequest> createUserValidator,
     IValidator<ResetPasswordRequest> resetPasswordValidator,
     IExportService exportService,
-    IOptions<ExportOptions> exportOptions) : BaseController
+    IOptions<ExportOptions> exportOptions,
+    IUserCompanyService? userCompanyService = null) : BaseController
 {
     private readonly IUserService _userService = userService;
     private readonly IRbacService _rbacService = rbacService;
@@ -34,6 +35,7 @@ public class UsersController(
     private readonly IValidator<ResetPasswordRequest> _resetPasswordValidator = resetPasswordValidator;
     private readonly IExportService _exportService = exportService;
     private readonly IOptions<ExportOptions> _exportOptions = exportOptions;
+    private readonly IUserCompanyService? _userCompanyService = userCompanyService;
 
     /// <summary>
     /// List all users with pagination
@@ -92,6 +94,29 @@ public class UsersController(
         ));
     }
 
+    /// <summary>Lists the global identity's active company memberships.</summary>
+    [HttpGet("{id:long}/companies")]
+    [RequirePermission(Permissions.User.Read)]
+    public async Task<IActionResult> GetMemberships(long id, CancellationToken ct)
+    {
+        if (_userCompanyService is null)
+            throw new NotSupportedException("Membership administration is not configured");
+        var result = await _userCompanyService.GetMembershipsAsync(id, User.IsInRole(RoleCodes.SuperAdmin), ct);
+        return Ok(OkResponse(result, SuccessMessages.User.ListRetrieved));
+    }
+
+    /// <summary>Gets the identity's membership in the selected company.</summary>
+    [HttpGet("{id:long}/companies/{companyId:long}")]
+    [RequirePermission(Permissions.User.Read)]
+    public async Task<IActionResult> GetMembership(long id, long companyId, CancellationToken ct)
+    {
+        if (_userCompanyService is null)
+            throw new NotSupportedException("Membership administration is not configured");
+        var result = await _userCompanyService.GetMembershipAsync(id, companyId, ct)
+            ?? throw new WAMS.Domain.Exceptions.NotFoundException("User company membership", $"{id}/{companyId}");
+        return Ok(OkResponse(result, SuccessMessages.User.Retrieved));
+    }
+
     /// <summary>
     /// Create a new user
     /// </summary>
@@ -113,7 +138,9 @@ public class UsersController(
         }
 
         var createdBy = GetUserId();
-        var result = await _userService.CreateAsync(request, createdBy);
+        var result = _userCompanyService is not null && User.FindFirst("company_id") is not null
+            ? await _userCompanyService.CreateUserAsync(request, GetCompanyId(), createdBy)
+            : await _userService.CreateAsync(request, createdBy);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -197,7 +224,10 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignRole(long id, long roleId)
     {
-        await _userService.AssignRoleAsync(id, new AssignRoleRequest(roleId), GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.AssignRoleAsync(id, GetCompanyId(), roleId, GetUserId());
+        else
+            await _userService.AssignRoleAsync(id, new AssignRoleRequest(roleId), GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.RoleAssigned));
     }
@@ -211,7 +241,10 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveRole(long id, long roleId)
     {
-        await _userService.RemoveRoleAsync(id, roleId, GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.RemoveRoleAsync(id, GetCompanyId(), roleId, GetUserId());
+        else
+            await _userService.RemoveRoleAsync(id, roleId, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.RoleRemoved));
     }
@@ -225,7 +258,10 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignWarehouse(long id, long warehouseId, [FromBody] AssignWarehouseRequest? body = null)
     {
-        await _userService.AssignWarehouseAsync(id, new AssignWarehouseRequest(warehouseId, body?.IsPrimary ?? false), GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.AssignWarehouseAsync(id, GetCompanyId(), warehouseId, body?.IsPrimary ?? false, GetUserId());
+        else
+            await _userService.AssignWarehouseAsync(id, new AssignWarehouseRequest(warehouseId, body?.IsPrimary ?? false), GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.WarehouseAssigned));
     }
@@ -239,7 +275,10 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveWarehouse(long id, long warehouseId)
     {
-        await _userService.RemoveWarehouseAsync(id, warehouseId, GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.RemoveWarehouseAsync(id, GetCompanyId(), warehouseId, GetUserId());
+        else
+            await _userService.RemoveWarehouseAsync(id, warehouseId, GetUserId());
 
         return Ok(OkResponse(SuccessMessages.User.WarehouseRemoved));
     }
@@ -253,7 +292,9 @@ public class UsersController(
     [ProducesResponseType(typeof(ApiResponse<List<UserPermissionOverrideResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPermissionOverrides(long id)
     {
-        var result = await _rbacService.GetUserPermissionOverridesAsync(id);
+        var result = UseMembershipContext
+            ? await _userCompanyService!.GetPermissionOverridesAsync(id, GetCompanyId())
+            : await _rbacService.GetUserPermissionOverridesAsync(id);
 
         return Ok(OkResponse(
             result,
@@ -270,8 +311,13 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GrantPermission(long id, long permissionId, [FromBody] UserPermissionOverrideRequest request)
     {
-        await _userService.EnsureCanMutateAsync(GetUserId(), id);
-        await _rbacService.GrantUserPermissionAsync(id, permissionId, request, GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.GrantPermissionAsync(id, GetCompanyId(), permissionId, true, request, GetUserId());
+        else
+        {
+            await _userService.EnsureCanMutateAsync(GetUserId(), id);
+            await _rbacService.GrantUserPermissionAsync(id, permissionId, request, GetUserId());
+        }
 
         return Ok(OkResponse(SuccessMessages.User.PermissionGranted));
     }
@@ -285,8 +331,13 @@ public class UsersController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DenyPermission(long id, long permissionId, [FromBody] UserPermissionOverrideRequest request)
     {
-        await _userService.EnsureCanMutateAsync(GetUserId(), id);
-        await _rbacService.DenyUserPermissionAsync(id, permissionId, request, GetUserId());
+        if (UseMembershipContext)
+            await _userCompanyService!.GrantPermissionAsync(id, GetCompanyId(), permissionId, false, request, GetUserId());
+        else
+        {
+            await _userService.EnsureCanMutateAsync(GetUserId(), id);
+            await _rbacService.DenyUserPermissionAsync(id, permissionId, request, GetUserId());
+        }
 
         return Ok(OkResponse(SuccessMessages.User.PermissionDenied));
     }
@@ -299,8 +350,13 @@ public class UsersController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> RemovePermissionOverride(long id, long permissionId)
     {
-        await _userService.EnsureCanMutateAsync(GetUserId(), id);
-        await _rbacService.RemoveUserPermissionAsync(id, permissionId);
+        if (UseMembershipContext)
+            await _userCompanyService!.RemovePermissionAsync(id, GetCompanyId(), permissionId, GetUserId());
+        else
+        {
+            await _userService.EnsureCanMutateAsync(GetUserId(), id);
+            await _rbacService.RemoveUserPermissionAsync(id, permissionId);
+        }
 
         return Ok(OkResponse(SuccessMessages.User.PermissionOverrideRemoved));
     }
@@ -320,4 +376,8 @@ public class UsersController(
             SuccessMessages.User.EffectivePermissionsRetrieved
         ));
     }
+
+    private bool UseMembershipContext
+        => _userCompanyService is not null
+            && User.FindFirst("company_id") is not null;
 }

@@ -8,13 +8,23 @@ import type {
     UpdateUserResponse,
     DeleteUserResponse,
     UserDetailResponse,
-    ResetUserPasswordResponse
+    ResetUserPasswordResponse,
+    UserCompanyMembership,
+    UserMembershipsResponse,
+    AddUserCompanyMembershipPayload,
 } from "../../../types/users.types";
+
+export interface UserCompanyMembershipResponse {
+    success: boolean;
+    message?: string;
+    data: UserCompanyMembership;
+}
 
 const USER_ENDPOINTS = {
     list: "api/v1/users",
     create: "api/v1/users",
     byId: (id: number) => `api/v1/users/${id}`,
+    memberships: (id: number) => `api/v1/users/${id}/companies`,
 } as const;
 
 export const userService = {
@@ -66,6 +76,29 @@ export const userService = {
         const { data } = await axiosProvider.get<UserDetailResponse>(
             USER_ENDPOINTS.byId(id)
         );
+        return data;
+    },
+
+    getMemberships: async (userId: number): Promise<UserMembershipsResponse> => {
+        const { data } = await axiosProvider.get<UserMembershipsResponse>(USER_ENDPOINTS.memberships(userId));
+        return data;
+    },
+
+    addMembership: async (
+        userId: number,
+        companyId: number,
+        payload?: AddUserCompanyMembershipPayload,
+    ) => {
+        const { data } = await axiosProvider.post<UserCompanyMembershipResponse>(
+            `api/v1/companies/${companyId}/users/${userId}`,
+            payload,
+        );
+        return data;
+    },
+
+    removeMembership: async (userId: number, companyId: number) => {
+        const { data } = await axiosProvider.delete<{ success: boolean; message?: string }>(
+            `api/v1/companies/${companyId}/users/${userId}`);
         return data;
     },
 

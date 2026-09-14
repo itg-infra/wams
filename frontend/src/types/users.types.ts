@@ -5,6 +5,25 @@ export interface UserRole {
     displayName: string;
 }
 
+export interface UserCompanyMembership {
+    id: number;
+    userId: number;
+    companyId: number;
+    companyCode?: string;
+    companyName: string;
+    authorizationVersion?: number;
+    roles?: UserRole[];
+    warehouses?: { warehouseId: number; name: string; code?: string; isPrimary: boolean }[];
+    scopes?: { provinceId: number; name: string; display: string }[];
+    createdAt?: string;
+    removedAt?: string | null;
+}
+
+export interface AddUserCompanyMembershipPayload {
+    roleIds?: number[];
+    provinceIds?: number[];
+}
+
 // ─── Warehouse ────────────────────────────────────────────────────────────────
 export interface UserWarehouse {
     warehouseId: number;
@@ -113,5 +132,12 @@ export interface UserDetailResponse {
     success: boolean;
     message?: string;
     data: User;
+    requestId?: string;
+}
+
+export interface UserMembershipsResponse {
+    success: boolean;
+    message?: string;
+    data: UserCompanyMembership[];
     requestId?: string;
 }

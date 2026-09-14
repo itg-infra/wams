@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test:config": "node --test vite.config.test.mjs",
     "preview": "vite preview",
     "start": "npm run build && npm run preview"
   },

@@ -142,16 +142,59 @@ try
                 {
                     var subject = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
                     var versionClaim = context.Principal?.FindFirst("session_version")?.Value;
-                    if (!long.TryParse(subject, out var userId) || !SessionVersionClaim.TryParse(versionClaim, out var tokenVersion))
+                    var companyClaim = context.Principal?.FindFirst("company_id")?.Value;
+                    var membershipIdClaim = context.Principal?.FindFirst("user_company_id")?.Value;
+                    var membershipVersionClaim = context.Principal?.FindFirst("membership_authorization_version")?.Value;
+                    if (!long.TryParse(subject, out var userId) ||
+                        !long.TryParse(companyClaim, out var actingCompanyId) ||
+                        actingCompanyId <= 0 ||
+                        !SessionVersionClaim.TryParse(versionClaim, out var tokenVersion) ||
+                        !SessionVersionClaim.TryParseNullable(membershipVersionClaim, out var parsedMembershipVersion))
                     {
                         context.Fail("Invalid session claim");
+                        return;
+                    }
+
+                    long? membershipId = null;
+                    int? membershipVersion = null;
+                    if (membershipIdClaim is not null)
+                    {
+                        if (!long.TryParse(membershipIdClaim, out var parsedMembershipId) ||
+                            parsedMembershipId <= 0 ||
+                            !parsedMembershipVersion.HasValue)
+                        {
+                            context.Fail("Invalid membership session claim");
+                            return;
+                        }
+
+                        membershipId = parsedMembershipId;
+                        membershipVersion = parsedMembershipVersion.Value;
+                    }
+                    else if (parsedMembershipVersion.HasValue)
+                    {
+                        context.Fail("Invalid membership session claim");
                         return;
                     }
 
                     var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
                     var user = await users.GetByIdUnfilteredReadOnlyAsync(userId, context.HttpContext.RequestAborted);
                     if (user is null || !user.IsActive || user.SessionVersion != tokenVersion)
+                    {
                         context.Fail("Session is no longer valid");
+                        return;
+                    }
+
+                    if (membershipId.HasValue)
+                    {
+                        var membership = user.UserCompanies.FirstOrDefault(uc =>
+                            uc.Id == membershipId.Value &&
+                            uc.CompanyId == actingCompanyId &&
+                            uc.RemovedAt == null &&
+                            uc.AuthorizationVersion == membershipVersion);
+
+                        if (membership is null || membership.Company is { IsActive: false })
+                            context.Fail("Membership session is no longer valid");
+                    }
                 }
             };
         });

@@ -25,6 +25,7 @@ public interface IRbacRepository
     /// role permission keys + active user overrides + global-access flag. Single UNION query.
     /// </summary>
     Task<UserRbacSnapshot> GetUserRbacSnapshotAsync(long userId, CancellationToken ct = default);
+    Task<UserRbacSnapshot> GetUserRbacSnapshotAsync(long userId, long? userCompanyId, CancellationToken ct = default);
 
     // Role-Permission assignments
     Task AssignPermissionToRoleAsync(long roleId, long permissionId, long? grantedBy, CancellationToken ct = default);

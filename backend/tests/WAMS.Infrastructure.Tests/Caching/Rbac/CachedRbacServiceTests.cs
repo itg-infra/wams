@@ -50,6 +50,21 @@ public sealed class CachedRbacServiceTests : IDisposable
         await _inner.Received(1).HasPermissionAsync(2, "m", "r", "a", Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task HasPermissionAsync_DifferentMemberships_CachedSeparately()
+    {
+        _inner.HasPermissionAsync(7, 101, "m", "r", "a", Arg.Any<CancellationToken>()).Returns(true);
+        _inner.HasPermissionAsync(7, 202, "m", "r", "a", Arg.Any<CancellationToken>()).Returns(false);
+
+        var companyA = await _sut.HasPermissionAsync(7, 101, "m", "r", "a", TestContext.Current.CancellationToken);
+        var companyB = await _sut.HasPermissionAsync(7, 202, "m", "r", "a", TestContext.Current.CancellationToken);
+
+        companyA.Should().BeTrue();
+        companyB.Should().BeFalse();
+        await _inner.Received(1).HasPermissionAsync(7, 101, "m", "r", "a", Arg.Any<CancellationToken>());
+        await _inner.Received(1).HasPermissionAsync(7, 202, "m", "r", "a", Arg.Any<CancellationToken>());
+    }
+
     // HasGlobalAccessAsync 
     [Fact]
     public async Task HasGlobalAccessAsync_CachesResult_InnerCalledOnce()
@@ -59,6 +74,21 @@ public sealed class CachedRbacServiceTests : IDisposable
         await _sut.HasGlobalAccessAsync(1, TestContext.Current.CancellationToken);
         await _sut.HasGlobalAccessAsync(1, TestContext.Current.CancellationToken);
 
+        await _inner.Received(1).HasGlobalAccessAsync(1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SystemPermissionAndGlobalAccess_UseIndependentCaches()
+    {
+        _inner.HasPermissionAsync(1, "m", "r", "a", Arg.Any<CancellationToken>()).Returns(false);
+        _inner.HasGlobalAccessAsync(1, Arg.Any<CancellationToken>()).Returns(true);
+
+        var permission = await _sut.HasPermissionAsync(1, "m", "r", "a", TestContext.Current.CancellationToken);
+        var globalAccess = await _sut.HasGlobalAccessAsync(1, TestContext.Current.CancellationToken);
+
+        permission.Should().BeFalse();
+        globalAccess.Should().BeTrue();
+        await _inner.Received(1).HasPermissionAsync(1, "m", "r", "a", Arg.Any<CancellationToken>());
         await _inner.Received(1).HasGlobalAccessAsync(1, Arg.Any<CancellationToken>());
     }
 

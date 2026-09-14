@@ -24,6 +24,9 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.HasIndex(rt => rt.UserId)
             .HasDatabaseName("idx_refresh_tokens_user_id");
 
+        builder.HasIndex(rt => new { rt.UserCompanyId, rt.RevokedAt })
+            .HasDatabaseName("idx_refresh_tokens_user_company_revoked");
+
         builder.Ignore(rt => rt.IsExpired);
         builder.Ignore(rt => rt.IsRevoked);
         builder.Ignore(rt => rt.IsActive);
@@ -32,10 +35,18 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.Property(rt => rt.UpdatedAt).HasColumnName("updated_at");
         builder.Property(rt => rt.UserId).HasColumnName("user_id");
         builder.Property(rt => rt.CompanyId).HasColumnName("company_id");
+        builder.Property(rt => rt.UserCompanyId).HasColumnName("user_company_id");
+        builder.Property(rt => rt.MembershipAuthorizationVersion)
+            .HasColumnName("membership_authorization_version");
         builder.Property(rt => rt.TokenHash).HasColumnName("token_hash");
         builder.Property(rt => rt.DeviceInfo).HasColumnName("device_info");
         builder.Property(rt => rt.IpAddress).HasColumnName("ip_address");
         builder.Property(rt => rt.ExpiresAt).HasColumnName("expires_at");
         builder.Property(rt => rt.RevokedAt).HasColumnName("revoked_at");
+
+        builder.HasOne(rt => rt.UserCompany)
+            .WithMany()
+            .HasForeignKey(rt => rt.UserCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -73,6 +73,20 @@ public class WarehouseMiddlewareTests
     }
 
     [Fact]
+    public async Task MembershipScopedUserWithWarehouseHeader_UsesExplicitWarehouseScope()
+    {
+        var ctx = BuildContext([
+            new Claim("company_id", "42"),
+            new Claim("user_company_id", "99")
+        ], warehouseHeader: "7");
+
+        await _sut.InvokeAsync(ctx, _warehouseContext);
+
+        _warehouseContext.Received(1).SetWarehouseId(7);
+        _warehouseContext.DidNotReceive().SetBypassMode();
+    }
+
+    [Fact]
     public async Task RegularUserWithoutWarehouseHeader_DoesNotSetWarehouseContext()
     {
         var ctx = BuildContext([]);

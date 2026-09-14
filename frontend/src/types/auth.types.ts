@@ -57,6 +57,7 @@ export interface AuthUser {
     permissions: string[];
     roles: string[];  
     company_id: string;
+    user_company_id?: string;
 }
 
 // ─── Auth Store State ─────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ export interface AuthState {
     isLogoutLoading: boolean;
     error: string | null;
     errorCode: string | null;
+    userCompanyId: number | null;
 
     hasPermission: (module: string, resource: string, action: string) => boolean;
     hasRole: (role: string) => boolean;

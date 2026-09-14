@@ -7,7 +7,9 @@ using WAMS.Application.Common;
 public interface IRbacService
 {
     Task<bool> HasPermissionAsync(long userId, string module, string resource, string action, CancellationToken ct = default);
+    Task<bool> HasPermissionAsync(long userId, long? userCompanyId, string module, string resource, string action, CancellationToken ct = default);
     Task<bool> HasGlobalAccessAsync(long userId, CancellationToken ct = default);
+    Task<bool> HasGlobalAccessAsync(long userId, long? userCompanyId, CancellationToken ct = default);
 
     // Roles
     Task<PaginatedResponse<RoleResponse>> GetAllRolesAsync(DataTableQuery query, CancellationToken ct = default);

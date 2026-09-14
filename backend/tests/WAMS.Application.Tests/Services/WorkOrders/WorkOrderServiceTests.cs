@@ -496,6 +496,37 @@ public class WorkOrderServiceTests
     }
 
     [Fact]
+    public async Task GetPicCandidatesAsync_WithMembershipContext_UsesCompanyScopedEligibility()
+    {
+        var context = new WorkOrderPicContext(CompanyId: 7, WarehouseShadowId: 3);
+        _woRepo.GetPicContextAsync(10, TestContext.Current.CancellationToken).Returns(context);
+        _rbacService.HasGlobalAccessAsync(42, Arg.Any<CancellationToken>()).Returns(false);
+        _userRepo.CheckWarehouseAccessAsync(42, 3, TestContext.Current.CancellationToken)
+            .Returns((true, true));
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.UserCompanyId.Returns(99L);
+
+        var service = new WorkOrderService(
+            _woRepo, _bpRepo, _toRepo, _recapRepo,
+            _warehouseCtx, _userRepo, _rbacService,
+            _codeCounterRepo, _uow, _metrics,
+            _updateValidator,
+            _auditWriter,
+            tenant);
+        _userRepo.GetUsersByPermissionAndWarehouseForCompanyAsync(
+                7, 3, Permissions.WorkOrder.Execute, Arg.Any<CancellationToken>())
+            .Returns([new User { Id = 2, Fullname = "Scoped PIC" }]);
+
+        var result = await service.GetPicCandidatesAsync(10, userId: 42, ct: TestContext.Current.CancellationToken);
+
+        result.Should().ContainSingle(r => r.Id == 2);
+        await _userRepo.Received(1).GetUsersByPermissionAndWarehouseForCompanyAsync(
+            7, 3, Permissions.WorkOrder.Execute, Arg.Any<CancellationToken>());
+        await _userRepo.DidNotReceive().GetUsersByPermissionAndWarehouseAsync(
+            Arg.Any<long>(), Arg.Any<long>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task GetPicCandidatesAsync_WoNotFound_Throws()
     {
         _woRepo.GetPicContextAsync(99, TestContext.Current.CancellationToken).ReturnsNull();

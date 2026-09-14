@@ -245,6 +245,34 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_ExcludesExpiredMembershipRoles()
+    {
+        _tenant.UserCompanyId.Returns(77L);
+        var user = TestBuilders.ActiveUser(id: 1);
+        var membership = new UserCompany { Id = 77, UserId = 1, CompanyId = 42 };
+        membership.Roles.Add(new UserCompanyRole
+        {
+            UserCompanyId = 77,
+            RoleId = 10,
+            Role = new Role { Id = 10, Name = "expired", DisplayName = "Expired" },
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-1)
+        });
+        membership.Roles.Add(new UserCompanyRole
+        {
+            UserCompanyId = 77,
+            RoleId = 11,
+            Role = new Role { Id = 11, Name = "active", DisplayName = "Active" },
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+        user.UserCompanies.Add(membership);
+        _userRepo.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(user);
+
+        var result = await _sut.GetByIdAsync(1, TestContext.Current.CancellationToken);
+
+        result.Roles.Should().ContainSingle().Which.RoleName.Should().Be("active");
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithProvinceIds_ResponseReflectsReloadedScope()
     {
         var before = TestBuilders.ActiveUser(id: 1); // no provinces yet

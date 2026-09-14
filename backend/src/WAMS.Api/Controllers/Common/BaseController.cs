@@ -37,6 +37,12 @@ public abstract class BaseController : ControllerBase
         return long.Parse(claim);
     }
 
+    protected long? GetUserCompanyId()
+    {
+        var claim = User.FindFirst("user_company_id")?.Value;
+        return long.TryParse(claim, out var id) && id > 0 ? id : null;
+    }
+
     protected string? GetFullname()
         => User.FindFirst("fullname")?.Value;
 

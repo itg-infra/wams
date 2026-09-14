@@ -5,6 +5,13 @@ using WAMS.Domain.Entities.Users;
 public interface ITokenService
 {
     string GenerateAccessToken(User user, List<string> roles, long companyId, bool hasWildcard = false);
+    string GenerateAccessToken(
+        User user,
+        IReadOnlyCollection<string> roles,
+        long companyId,
+        long? userCompanyId,
+        int? membershipAuthorizationVersion,
+        bool hasWildcard = false);
     string GenerateRefreshToken();
     Task BlacklistTokenAsync(string jti, TimeSpan expiry);
     Task<bool> IsTokenBlacklistedAsync(string jti);

@@ -12,6 +12,8 @@ public class TenantMiddleware(RequestDelegate next)
         {
             var companyIdClaim = context.User.FindFirst("company_id")?.Value;
             if (companyIdClaim != null && long.TryParse(companyIdClaim, out var companyId)) tenantContext.SetCompanyId(companyId);
+            var membershipClaim = context.User.FindFirst("user_company_id")?.Value;
+            if (membershipClaim != null && long.TryParse(membershipClaim, out var membershipId)) tenantContext.SetMembership(membershipId);
         }
 
         await _next(context);

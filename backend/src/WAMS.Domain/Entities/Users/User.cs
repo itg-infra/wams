@@ -21,6 +21,7 @@ public class User : BaseEntity
 
     // Navigation properties (like preload in gorm)
     public ICollection<UserRole> UserRoles { get; set; } = [];
+    public ICollection<UserCompany> UserCompanies { get; set; } = [];
     public ICollection<UserWarehouse> UserWarehouses { get; set; } = [];
     public ICollection<UserProvince> UserProvinces { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];

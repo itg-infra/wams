@@ -7,6 +7,8 @@ import type {
     UserListParams,
     UserState,
     User,
+    UserCompanyMembership,
+    AddUserCompanyMembershipPayload,
 } from "../types/users.types";
 
 interface UserStoreState extends UserState {
@@ -43,6 +45,20 @@ interface UserStoreState extends UserState {
     assignWarehouseToUser: (userId: number, warehouseId: number) => Promise<void>;
 
     removeWarehouseFromUser: (userId: number, warehouseId: number) => Promise<void>;
+
+    // Memberships
+    memberships: UserCompanyMembership[];
+    membershipUserId: number | null;
+    pendingMembershipAdds: Record<string, true>;
+    isLoadingMemberships: boolean;
+    membershipError: string | null;
+    fetchMemberships: (userId: number) => Promise<void>;
+    addMembership: (
+        userId: number,
+        companyId: number,
+        payload?: AddUserCompanyMembershipPayload,
+    ) => Promise<boolean>;
+    removeMembership: (userId: number, companyId: number) => Promise<boolean>;
 }
 
 export const useUserStore = create<UserStoreState>()(
@@ -218,6 +234,84 @@ export const useUserStore = create<UserStoreState>()(
                     console.error("Remove warehouse failed", err);
                 } finally {
                     set({ isRemovingWarehouse: false });
+                }
+            },
+
+            memberships: [],
+            membershipUserId: null,
+            pendingMembershipAdds: {},
+            isLoadingMemberships: false,
+            membershipError: null,
+
+            fetchMemberships: async (userId) => {
+                set({
+                    memberships: [],
+                    membershipUserId: userId,
+                    isLoadingMemberships: true,
+                    membershipError: null,
+                });
+                try {
+                    const response = await userService.getMemberships(userId);
+                    if (get().membershipUserId !== userId) return;
+                    if (!response.success) {
+                        set({ isLoadingMemberships: false, membershipError: response.message ?? "Failed to load memberships." });
+                        return;
+                    }
+                    set({ memberships: response.data, isLoadingMemberships: false });
+                } catch (err: unknown) {
+                    if (get().membershipUserId !== userId) return;
+                    const e = err as { response?: { data?: { message?: string } } };
+                    set({ isLoadingMemberships: false, membershipError: e?.response?.data?.message ?? "Failed to load memberships." });
+                }
+            },
+
+            addMembership: async (userId, companyId, payload) => {
+                const requestKey = `${userId}:${companyId}`;
+                if (get().pendingMembershipAdds[requestKey]) return false;
+                set((state) => ({
+                    membershipError: null,
+                    pendingMembershipAdds: {
+                        ...state.pendingMembershipAdds,
+                        [requestKey]: true,
+                    },
+                }));
+                try {
+                    const response = await userService.addMembership(userId, companyId, payload);
+                    if (!response.success) {
+                        set({ membershipError: response.message ?? "Failed to add membership." });
+                        return false;
+                    }
+                    if (get().membershipUserId === userId)
+                        await get().fetchMemberships(userId);
+                    return true;
+                } catch (err: unknown) {
+                    const e = err as { response?: { data?: { message?: string } } };
+                    set({ membershipError: e?.response?.data?.message ?? "Failed to add membership." });
+                    return false;
+                } finally {
+                    set((state) => {
+                        const pendingMembershipAdds = { ...state.pendingMembershipAdds };
+                        delete pendingMembershipAdds[requestKey];
+                        return { pendingMembershipAdds };
+                    });
+                }
+            },
+
+            removeMembership: async (userId, companyId) => {
+                set({ membershipError: null });
+                try {
+                    const response = await userService.removeMembership(userId, companyId);
+                    if (!response.success) {
+                        set({ membershipError: response.message ?? "Failed to remove membership." });
+                        return false;
+                    }
+                    if (get().membershipUserId === userId)
+                        await get().fetchMemberships(userId);
+                    return true;
+                } catch (err: unknown) {
+                    const e = err as { response?: { data?: { message?: string } } };
+                    set({ membershipError: e?.response?.data?.message ?? "Failed to remove membership." });
+                    return false;
                 }
             },
         }),

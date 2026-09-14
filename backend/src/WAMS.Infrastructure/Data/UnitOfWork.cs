@@ -15,7 +15,7 @@ public sealed class UnitOfWork(AppDbContext db) : IUnitOfWork
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new ConflictException(ErrorMessages.BudgetPlan.AlreadyProcessed);
+            throw new ConflictException(ErrorMessages.Common.ConcurrentModification);
         }
     }
 

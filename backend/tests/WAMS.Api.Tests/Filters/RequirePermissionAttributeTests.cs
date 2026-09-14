@@ -140,4 +140,24 @@ public class RequirePermissionAttributeTests
         await _tokenSvc.DidNotReceive().IsTokenBlacklistedAsync(Arg.Any<string>());
         ctx.Result.Should().BeNull();
     }
+
+    [Fact]
+    public async Task OnAuthorizationAsync_WithMembershipClaims_UsesMembershipScopedRbac()
+    {
+        var identity = new ClaimsIdentity([
+            new Claim(JwtRegisteredClaimNames.Sub, "1"),
+            new Claim("company_id", "20"),
+            new Claim("user_company_id", "77")
+        ], authenticationType: "jwt");
+        var user = new ClaimsPrincipal(identity);
+        _rbacSvc.HasPermissionAsync(1, 77, "user", "user", "read", Arg.Any<CancellationToken>()).Returns(true);
+
+        var attr = new RequirePermissionAttribute("user.user.read");
+        var ctx = BuildContext(user: user);
+
+        await attr.OnAuthorizationAsync(ctx);
+
+        await _rbacSvc.Received(1).HasPermissionAsync(1, 77, "user", "user", "read", Arg.Any<CancellationToken>());
+        await _rbacSvc.DidNotReceive().HasPermissionAsync(1, "user", "user", "read", Arg.Any<CancellationToken>());
+    }
 }

@@ -1,5 +1,6 @@
 namespace WAMS.Application.Services.Rca;
 
+using WAMS.Application.Common;
 using WAMS.Application.DTOs.Rca;
 using WAMS.Application.Export;
 using WAMS.Application.Interfaces.Common;
@@ -56,9 +57,9 @@ public class RcaService(
         if (warehouseContext.IsSet && warehouseContext.WarehouseId.HasValue)
             return [warehouseContext.WarehouseId.Value];
 
-        var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+        var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
         if (!hasGlobal)
-            return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+            return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
 
         return null;
     }

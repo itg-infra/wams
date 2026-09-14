@@ -44,7 +44,20 @@ public class RequirePermissionAttribute : Attribute, IAsyncAuthorizationFilter
             throw new UnauthorizedException(ErrorMessages.Permission.InvalidTokenSubject);
 
         var rbacService = GetService<IRbacService>(context);
-        var hasPermission = await rbacService.HasPermissionAsync(userId, _module, _resource, _action);
+        var membershipClaim = user.FindFirst("user_company_id")?.Value;
+        var hasCompanyClaim = user.FindFirst("company_id") is not null;
+        if (membershipClaim is not null &&
+            (!long.TryParse(membershipClaim, out var membershipId) || membershipId <= 0))
+            throw new UnauthorizedException(ErrorMessages.Permission.InvalidTokenSubject);
+
+        var hasPermission = hasCompanyClaim
+            ? await rbacService.HasPermissionAsync(
+                userId,
+                membershipClaim is null ? null : long.Parse(membershipClaim),
+                _module,
+                _resource,
+                _action)
+            : await rbacService.HasPermissionAsync(userId, _module, _resource, _action);
 
         if (!hasPermission)
             throw new ForbiddenException(ErrorMessages.Permission.MissingPermission(_permission));

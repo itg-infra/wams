@@ -2,6 +2,12 @@ namespace WAMS.Domain.Constants;
 
 public static class ErrorMessages
 {
+    public static class Common
+    {
+        public const string ConcurrentModification =
+            "The resource was modified by another request. Please reload and try again.";
+    }
+
     public static class Permission
     {
         public const string AuthenticationRequired = "Authentication required";
@@ -193,6 +199,16 @@ public static class ErrorMessages
         public static string EmailConflict(string email) => $"User with email '{email}' already exists";
         public static string AlreadyHasRole(string name) => $"User already has role '{name}'";
         public const string AlreadyAssignedToCompany = "User is already assigned to this company";
+        public const string GlobalAccessMembershipNotApplicable =
+            "Company memberships do not apply to users with global access";
+        public const string ExistingIdentityMembershipRequiresSystemAdmin =
+            "Only a system administrator can attach an existing identity to another company";
+        public const string MembershipRemovalRequiresSystemAdmin =
+            "Only a system administrator can remove a company membership";
+        public const string MembershipWarehouseCompanyMismatch =
+            "Every warehouse assignment must belong to the membership company";
+        public const string MembershipSuperAdminRoleDenied =
+            "SUPER_ADMIN is a system role and cannot be assigned to a company membership";
         public const string SuperAdminMutationDenied = "Only a super administrator can modify a super administrator account";
         public const string LastActiveSuperAdmin = "At least one active super administrator must remain";
     }

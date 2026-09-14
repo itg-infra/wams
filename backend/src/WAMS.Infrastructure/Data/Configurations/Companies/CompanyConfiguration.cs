@@ -28,6 +28,11 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasForeignKey(u => u.CompanyId)
             .OnDelete(DeleteBehavior.Restrict);  // do not cascade-delete users if company is deleted
 
+        builder.HasMany(c => c.UserCompanies)
+            .WithOne(uc => uc.Company)
+            .HasForeignKey(uc => uc.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(c => c.Warehouses)
             .WithOne(w => w.Company)
             .HasForeignKey(w => w.CompanyId)

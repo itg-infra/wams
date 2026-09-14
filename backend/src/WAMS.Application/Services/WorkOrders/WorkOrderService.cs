@@ -3,6 +3,7 @@ namespace WAMS.Application.Services.WorkOrders;
 using System.Text.Json;
 using WAMS.Application.DTOs.BudgetPlans;
 using WAMS.Application.DTOs.WorkOrders;
+using WAMS.Application.Common;
 using WAMS.Application.Interfaces.AuditLogs;
 using WAMS.Application.Interfaces.BudgetPlans;
 using WAMS.Application.Interfaces.Common;
@@ -32,7 +33,8 @@ public class WorkOrderService(
     IUnitOfWork uow,
     IWamsMetrics metrics,
     FluentValidation.IValidator<UpdateWorkOrderRequest> updateValidator,
-    IAuditLogWriter auditLogWriter
+    IAuditLogWriter auditLogWriter,
+    ITenantContext? tenantContext = null
 ) : IWorkOrderService
 {
     public async Task<(List<WorkOrderSummaryResponse> Items, int TotalCount)> GetAllAsync(
@@ -405,7 +407,9 @@ public class WorkOrderService(
 
     // PIC eligibility is granted via workorder.workorder.execute, not tied to a specific role.
     private Task<List<User>> GetEligiblePicUsersAsync(long companyId, long warehouseId, CancellationToken ct) =>
-        userRepo.GetUsersByPermissionAndWarehouseAsync(companyId, warehouseId, Permissions.WorkOrder.Execute, ct);
+        tenantContext?.UserCompanyId.HasValue == true
+            ? userRepo.GetUsersByPermissionAndWarehouseForCompanyAsync(companyId, warehouseId, Permissions.WorkOrder.Execute, ct)
+            : userRepo.GetUsersByPermissionAndWarehouseAsync(companyId, warehouseId, Permissions.WorkOrder.Execute, ct);
 
     // Warehouse scope resolution
     private async Task<IReadOnlyList<long>?> ResolveWarehouseIdsAsync(long userId, CancellationToken ct)
@@ -415,9 +419,9 @@ public class WorkOrderService(
 
         if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
-                return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+                return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
         }
 
         return null; // SuperAdmin bypass - no filter

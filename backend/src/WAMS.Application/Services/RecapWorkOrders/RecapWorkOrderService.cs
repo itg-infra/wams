@@ -1,6 +1,7 @@
 namespace WAMS.Application.Services.RecapWorkOrders;
 
 using System.Text.Json;
+using WAMS.Application.Common;
 using WAMS.Application.DTOs.RecapWorkOrders;
 using WAMS.Application.Interfaces.AuditLogs;
 using WAMS.Application.Interfaces.BudgetPlans;
@@ -20,7 +21,8 @@ public class RecapWorkOrderService(
     IRbacService rbacService,
     IWarehouseContext warehouseContext,
     IWamsMetrics metrics,
-    IAuditLogWriter auditLogWriter
+    IAuditLogWriter auditLogWriter,
+    ITenantContext? tenantContext = null
 ) : IRecapWorkOrderService
 {
     public async Task<(List<RecapWorkOrderSummaryResponse> Items, int TotalCount)> GetAllAsync(
@@ -156,9 +158,9 @@ public class RecapWorkOrderService(
 
         if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
-                return (await userRepo.GetUserWarehouseIdsAsync(userId, ct)).ToList();
+                return (await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct)).ToList();
         }
 
         return null;
@@ -166,10 +168,10 @@ public class RecapWorkOrderService(
 
     private async Task EnsureUserCanAccessWarehouseAsync(long warehouseId, long userId, CancellationToken ct)
     {
-        if (await rbacService.HasGlobalAccessAsync(userId, ct))
+        if (await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct))
             return;
 
-        var ids = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+        var ids = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
         if (!ids.Contains(warehouseId))
             throw new ForbiddenException(ErrorMessages.RecapWorkOrder.AccessDeniedDifferentWarehouse);
     }

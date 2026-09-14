@@ -1,8 +1,10 @@
 namespace WAMS.Application.Services.Spk;
 
 using System.Runtime.CompilerServices;
+using WAMS.Application.Common;
 using WAMS.Application.DTOs.Spk;
 using WAMS.Application.Interfaces.Rbac;
+using WAMS.Application.Interfaces.Common;
 using WAMS.Application.Interfaces.Spk;
 using WAMS.Application.Interfaces.Users;
 using WAMS.Application.Interfaces.Warehouses;
@@ -15,7 +17,8 @@ public class SpkService(
     IWarehouseShadowRepository warehouseRepo,
     IWarehouseContext warehouseContext,
     IUserRepository userRepo,
-    IRbacService rbacService
+    IRbacService rbacService,
+    ITenantContext? tenantContext = null
 ) : ISpkService
 {
     public async Task<(List<SpkShadow> Items, int TotalCount)> GetAllAsync(
@@ -67,10 +70,10 @@ public class SpkService(
 
         if (!warehouseContext.IsSet)
         {
-            var hasGlobal = await rbacService.HasGlobalAccessAsync(userId, ct);
+            var hasGlobal = await UserScope.HasGlobalAccessAsync(rbacService, tenantContext, userId, ct);
             if (!hasGlobal)
             {
-                var warehouseIds = await userRepo.GetUserWarehouseIdsAsync(userId, ct);
+                var warehouseIds = await UserScope.GetWarehouseIdsAsync(userRepo, tenantContext, userId, ct);
                 return await warehouseRepo.GetCodesByIdsAsync(warehouseIds, ct);
             }
         }

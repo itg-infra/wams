@@ -10,6 +10,7 @@ export interface MeResponseData {
   companyId: string;
   companyName: string;
   companyCode: string;
+  userCompanyId: number | null;
   roles: string[];
   permissions: string[];
   permissionMap: Record<string, Record<string, string[]>>;
@@ -43,6 +44,7 @@ export interface User {
     companyId: string,
     companyName: string;
     companyCode: string;
+    userCompanyId: number | null;
     email: string;
     fullname: string;
     employeeId: string | null;
@@ -60,6 +62,7 @@ export const mapUser = (data: MeResponseData): User => ({
     companyId: String(data.companyId),
     companyName: data.companyName,
     companyCode: data.companyCode,
+    userCompanyId: data.userCompanyId ?? null,
     email: data.email,
     fullname: data.fullname,
     employeeId: data.employeeId,

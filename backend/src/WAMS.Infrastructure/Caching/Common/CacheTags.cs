@@ -12,6 +12,7 @@ internal static class CacheTags
     internal const string PermissionsCatalog = "permissions-catalog";
 
     internal static string RbacUser(long userId) => $"rbac-user:{userId}";
+    internal static string RbacMembership(long userCompanyId) => $"rbac-membership:{userCompanyId}";
 
     // Reference data
     internal const string Uom = "uom";
@@ -23,6 +24,7 @@ internal static class CacheTags
     // ERP-synced shadows
     internal const string WarehouseShadows = "warehouse-shadows";
     internal static string WarehouseShadowsForUser(long userId) => $"warehouse-shadows:user:{userId}";
+    internal static string WarehouseShadowsForMembership(long userCompanyId) => $"warehouse-shadows:membership:{userCompanyId}";
 
     // Lookup data
     internal const string RateCards = "rate-cards";
@@ -38,6 +40,11 @@ internal static class CacheKeys
         => $"rbac:perm:{userId}:{module}.{resource}.{action}";
 
     internal static string RbacGlobal(long userId) => $"rbac:global:{userId}";
+    internal static string RbacSystemPerm(long userId, string module, string resource, string action)
+        => $"rbac:system:{userId}:{module}.{resource}.{action}";
+    internal static string RbacMembershipPerm(long userCompanyId, string module, string resource, string action)
+        => $"rbac:membership:{userCompanyId}:{module}.{resource}.{action}";
+    internal static string RbacMembershipGlobal(long userCompanyId) => $"rbac:membership-global:{userCompanyId}";
     internal const string PermissionsCatalog = "rbac:catalog";
 
     // UoM

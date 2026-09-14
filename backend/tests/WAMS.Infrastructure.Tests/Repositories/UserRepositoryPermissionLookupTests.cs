@@ -372,6 +372,45 @@ public class UserRepositoryPermissionLookupTests
     }
 
     [Fact]
+    public async Task MembershipScopedPermissionLookup_ReturnsSecondaryCompanyUser()
+    {
+        var o = NewDb();
+        var (fieldRole, _, _) = await SeedBaseAsync(o);
+        await SeedWarehouseInProvinceAsync(o, WarehouseId, ProvinceId, ProvinceCodes.Global);
+        await using (var db = Open(o))
+        {
+            db.Companies.Add(new Company { Id = 99, Name = "Home", Code = "HOME", IsActive = true });
+            var user = new User
+            {
+                Id = 18,
+                Email = "secondary@other-home.example",
+                Fullname = "Secondary Company User",
+                CompanyId = 99,
+                IsActive = true
+            };
+            var membership = new UserCompany
+            {
+                Id = 19,
+                UserId = user.Id,
+                CompanyId = CompanyId,
+                User = user,
+                Roles = [new UserCompanyRole { UserCompanyId = 19, RoleId = fieldRole }],
+                Warehouses = [new UserCompanyWarehouse { UserCompanyId = 19, WarehouseId = WarehouseId }]
+            };
+            user.UserCompanies.Add(membership);
+            db.Users.Add(user);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var queryDb = Open(o);
+        var repo = new UserRepository(queryDb);
+        var result = await repo.GetUsersByPermissionAndWarehouseForCompanyAsync(
+            CompanyId, WarehouseId, Key, TestContext.Current.CancellationToken);
+
+        result.Should().ContainSingle(u => u.Id == 18);
+    }
+
+    [Fact]
     public async Task MalformedKey_ReturnsEmpty()
     {
         var o = NewDb();

@@ -26,4 +26,5 @@ public class WarehouseShadow : IShadowEntity
     public bool IsActive { get; set; } = true; // set to false when missing from ERP response
 
     public ICollection<UserWarehouse> UserWarehouses { get; set; } = [];
+    public ICollection<UserCompanyWarehouse> UserCompanyWarehouses { get; set; } = [];
 }

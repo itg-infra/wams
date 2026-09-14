@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Building2, MapPinned, ShieldCheck, X } from "lucide-react";
 import { PageHeader } from "../components/ui/page-header";
 import { Button } from "../components/ui/button";
 import { userService } from "../api/services/masterData/userService";
@@ -7,6 +7,8 @@ import type { User } from "../types/users.types";
 import { useRoleStore } from "../store/roleStore";
 import { useUserStore } from "../store/userStore";
 import { useWarehouseStore } from "../store/warehouseStore";
+import { useCompanyStore } from "../store/companyStore";
+import { useAuthStore } from "../store/authStore";
 
 interface UserDetailScreenProps {
   userId: number;
@@ -23,12 +25,19 @@ export default function UserDetailScreen({
   const [roleOpen, setRoleOpen] = useState(false);
   const [warehouseOpen, setWarehouseOpen] = useState(false);
   const [warehouseSearch, setWarehouseSearch] = useState("");
+  const [membershipCompanyId, setMembershipCompanyId] = useState("");
+  const [membershipDialogOpen, setMembershipDialogOpen] = useState(false);
+  const [copyRoles, setCopyRoles] = useState(true);
+  const [copyProvinces, setCopyProvinces] = useState(false);
+  const [isAddingMembership, setIsAddingMembership] = useState(false);
 
   const {
     warehouses,
     fetchWarehouses,
     isLoading: isLoadingWarehouse,
   } = useWarehouseStore();
+  const { companies, fetchCompanies } = useCompanyStore();
+  const actingCompanyId = Number(useAuthStore((state) => state.user?.companyId));
 
   const { roles, fetchRoles } = useRoleStore();
   const {
@@ -38,6 +47,12 @@ export default function UserDetailScreen({
     assignWarehouseToUser,
     removeWarehouseFromUser,
     isRemovingWarehouse,
+    memberships,
+    isLoadingMemberships,
+    membershipError,
+    fetchMemberships,
+    addMembership,
+    removeMembership,
   } = useUserStore();
 
   const fetchDetail = async () => {
@@ -73,13 +88,59 @@ export default function UserDetailScreen({
     fetchWarehouses({ page: 1, search: warehouseSearch });
   }, [fetchWarehouses, warehouseSearch]);
 
+  useEffect(() => {
+    fetchMemberships(userId);
+  }, [fetchMemberships, userId]);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
   const currentRole = user?.roles?.[0] ?? null;
+  const hasGlobalAccess = user?.roles?.some(
+    (role) => role.roleName === "SUPER_ADMIN",
+  ) ?? false;
 
   const companyName = user?.warehouses?.length
     ? user.warehouses[0].name
     : "No Company";
 
   const fullName = user?.fullname ?? "-";
+
+  const sourceMembership = memberships.find(
+    (membership) => membership.companyId === actingCompanyId,
+  );
+  const selectedMembershipCompany = companies.find(
+    (company) => company.id === Number(membershipCompanyId),
+  );
+  const copyableRoleIds = (sourceMembership?.roles ?? [])
+    .filter((role) => role.roleName !== "SUPER_ADMIN")
+    .map((role) => role.roleId);
+  const copyableProvinceIds = (sourceMembership?.scopes ?? []).map(
+    (scope) => scope.provinceId,
+  );
+
+  const closeMembershipDialog = () => {
+    if (isAddingMembership) return;
+    setMembershipDialogOpen(false);
+    setCopyRoles(true);
+    setCopyProvinces(false);
+  };
+
+  const confirmMembership = async () => {
+    if (!selectedMembershipCompany) return;
+    setIsAddingMembership(true);
+    const ok = await addMembership(userId, selectedMembershipCompany.id, {
+      roleIds: copyRoles ? copyableRoleIds : [],
+      provinceIds: copyProvinces ? copyableProvinceIds : [],
+    });
+    setIsAddingMembership(false);
+    if (!ok) return;
+    setMembershipCompanyId("");
+    setMembershipDialogOpen(false);
+    setCopyRoles(true);
+    setCopyProvinces(false);
+  };
 
   return (
     <div
@@ -380,6 +441,209 @@ export default function UserDetailScreen({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-white/70 pt-5">
+            {hasGlobalAccess ? (
+              <div
+                id="lbl_GlobalCompanyAccess"
+                className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3"
+              >
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+                <div>
+                  <p className="text-sm font-semibold text-indigo-950">
+                    Access to all active companies
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-indigo-700">
+                    Super Administrators have global company access automatically.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <Building2 className="h-4 w-4 text-indigo-600" /> Company Access
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  id="txt_MembershipCompanyId"
+                  value={membershipCompanyId}
+                  onChange={(event) => setMembershipCompanyId(event.target.value)}
+                  className="w-40 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">Select company</option>
+                  {companies
+                    .filter((company) => !memberships.some((membership) => membership.companyId === company.id))
+                    .map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.code} · {company.name}
+                      </option>
+                    ))}
+                </select>
+                <Button
+                  id="btn_AddMembership"
+                  size="sm"
+                  disabled={isLoadingMemberships || !/^\d+$/.test(membershipCompanyId)}
+                  onClick={() => setMembershipDialogOpen(true)}
+                >
+                  Add Access
+                </Button>
+              </div>
+            </div>
+
+            {membershipError && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" /> {membershipError}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-col gap-2">
+              {isLoadingMemberships ? (
+                <div className="flex items-center gap-2 py-3 text-xs text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                </div>
+              ) : memberships.length > 0 ? (
+                memberships.map((membership) => (
+                  <div
+                    key={membership.id}
+                    className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2.5"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">
+                        {membership.companyName}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {membership.companyCode || `Company #${membership.companyId}`}
+                      </p>
+                    </div>
+                    <button
+                      id={`btn_RemoveMembership_${membership.companyId}`}
+                      type="button"
+                      className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      disabled={isLoadingMemberships}
+                      onClick={() => removeMembership(userId, membership.companyId)}
+                    >
+                      Remove access
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="py-3 text-xs text-gray-400">No company access found.</p>
+              )}
+            </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!hasGlobalAccess && membershipDialogOpen && selectedMembershipCompany && (
+        <div
+          id="lbl_AddMembershipDialog"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lbl_AddMembershipTitle"
+        >
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                  Company access
+                </p>
+                <h2 id="lbl_AddMembershipTitle" className="mt-1 text-lg font-bold text-slate-900">
+                  Add {fullName} to {selectedMembershipCompany.name}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Choose which safe assignments to carry into the new Company Access.
+                </p>
+              </div>
+              <button
+                id="icn_CloseMembershipDialog"
+                type="button"
+                onClick={closeMembershipDialog}
+                disabled={isAddingMembership}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 px-6 py-5">
+              {membershipError && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{membershipError}</span>
+                </div>
+              )}
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-indigo-200 hover:bg-indigo-50/40">
+                <input
+                  id="chk_CopyMembershipRoles"
+                  type="checkbox"
+                  checked={copyRoles}
+                  onChange={(event) => setCopyRoles(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-indigo-600"
+                />
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-800">
+                    Copy roles from current company
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    {copyableRoleIds.length > 0
+                      ? `${copyableRoleIds.length} global role${copyableRoleIds.length === 1 ? "" : "s"} will be reused.`
+                      : "No reusable company roles are currently assigned."}
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/40">
+                <input
+                  id="chk_CopyMembershipProvinces"
+                  type="checkbox"
+                  checked={copyProvinces}
+                  onChange={(event) => setCopyProvinces(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-emerald-600"
+                />
+                <MapPinned className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-800">
+                    Copy province scopes
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    {copyableProvinceIds.length > 0
+                      ? `${copyableProvinceIds.length} province scope${copyableProvinceIds.length === 1 ? "" : "s"} will be copied.`
+                      : "No province scopes are currently assigned."}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-4">
+              <Button
+                id="btn_CancelAddMembership"
+                type="button"
+                variant="outline"
+                onClick={closeMembershipDialog}
+                disabled={isAddingMembership}
+              >
+                Cancel
+              </Button>
+              <Button
+                id="btn_ConfirmAddMembership"
+                type="button"
+                onClick={confirmMembership}
+                disabled={isAddingMembership}
+              >
+                {isAddingMembership && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Access
+              </Button>
             </div>
           </div>
         </div>

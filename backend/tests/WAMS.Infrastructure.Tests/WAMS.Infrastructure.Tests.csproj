@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\tools\WAMS.E2eReset\WAMS.E2eReset.csproj" />
     <ProjectReference Include="..\..\src\WAMS.Infrastructure\WAMS.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\WAMS.Application\WAMS.Application.csproj" />
     <ProjectReference Include="..\..\src\WAMS.Domain\WAMS.Domain.csproj" />

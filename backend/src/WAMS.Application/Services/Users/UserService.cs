@@ -471,6 +471,9 @@ public class UserService : IUserService
     public Task<List<long>> GetUserProvinceIdsAsync(long userId, CancellationToken ct = default)
         => _userRepo.GetUserProvinceIdsAsync(userId, ct);
 
+    public Task<List<long>> GetUserProvinceIdsAsync(long userId, long? userCompanyId, CancellationToken ct = default)
+        => _userRepo.GetUserProvinceIdsAsync(userId, userCompanyId, ct);
+
     public async Task EnsureCanMutateAsync(
         long actorUserId,
         long targetUserId,
@@ -497,28 +500,34 @@ public class UserService : IUserService
             throw new ConflictException(ErrorMessages.User.LastActiveSuperAdmin);
     }
 
-    private static UserResponse MapToResponse(User user) => new(
-        user.Id,
-        user.Email,
-        user.Fullname,
-        user.IsActive,
-        user.CreatedAt,
-        [.. user.UserRoles.Select(ur => new UserRoleInfo(
-            ur.RoleId,
-            ur.Role.Name,
-            ur.Role.DisplayName)
-        )],
-        [.. user.UserWarehouses.Select(uw => new UserWarehouseInfo(
-            uw.WarehouseId,
-            uw.Warehouse.Code,
-            uw.Warehouse.Name,
-            uw.IsPrimary)
-        )],
-        [.. user.UserProvinces.Select(up => new UserProvinceInfo(
-            up.ProvinceId,
-            up.Province.Name,
-            up.Province.Display)).OrderBy(p => p.Display)
-        ],
-        user.EmployeeId
-    );
+    private UserResponse MapToResponse(User user)
+    {
+        var membership = _tenantContext.UserCompanyId.HasValue
+            ? user.UserCompanies.FirstOrDefault(uc => uc.Id == _tenantContext.UserCompanyId && uc.RemovedAt == null)
+            : null;
+
+        return membership is null
+            ? new UserResponse(
+                user.Id,
+                user.Email,
+                user.Fullname,
+                user.IsActive,
+                user.CreatedAt,
+                [.. user.UserRoles.Select(ur => new UserRoleInfo(ur.RoleId, ur.Role.Name, ur.Role.DisplayName))],
+                [.. user.UserWarehouses.Select(uw => new UserWarehouseInfo(uw.WarehouseId, uw.Warehouse.Code, uw.Warehouse.Name, uw.IsPrimary))],
+                [.. user.UserProvinces.Select(up => new UserProvinceInfo(up.ProvinceId, up.Province.Name, up.Province.Display)).OrderBy(p => p.Display)],
+                user.EmployeeId)
+            : new UserResponse(
+                user.Id,
+                user.Email,
+                user.Fullname,
+                user.IsActive,
+                user.CreatedAt,
+                [.. membership.Roles
+                    .Where(r => r.ExpiresAt is null || r.ExpiresAt > DateTime.UtcNow)
+                    .Select(r => new UserRoleInfo(r.RoleId, r.Role.Name, r.Role.DisplayName))],
+                [.. membership.Warehouses.Select(w => new UserWarehouseInfo(w.WarehouseId, w.Warehouse.Code, w.Warehouse.Name, w.IsPrimary))],
+                [.. membership.Provinces.Select(p => new UserProvinceInfo(p.ProvinceId, p.Province.Name, p.Province.Display)).OrderBy(p => p.Display)],
+                user.EmployeeId);
+    }
 }

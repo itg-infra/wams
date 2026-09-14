@@ -15,5 +15,6 @@ public class Company : BaseEntity
     public string? LogoStorageKey { get; set; }
 
     public ICollection<User> Users { get; set; } = [];
+    public ICollection<UserCompany> UserCompanies { get; set; } = [];
     public ICollection<WarehouseShadow> Warehouses { get; set; } = [];
 }

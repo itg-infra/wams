@@ -41,12 +41,33 @@ public class RbacService : IRbacService
         return EvaluatePermission(snapshot, module, resource, action);
     }
 
+    public async Task<bool> HasPermissionAsync(
+        long userId,
+        long? userCompanyId,
+        string module,
+        string resource,
+        string action,
+        CancellationToken ct = default)
+    {
+        var snapshot = await _rbacRepo.GetUserRbacSnapshotAsync(userId, userCompanyId, ct);
+        return EvaluatePermission(snapshot, module, resource, action);
+    }
+
     public async Task<bool> HasGlobalAccessAsync(long userId, CancellationToken ct = default)
     {
         var snapshot = await _rbacRepo.GetUserRbacSnapshotAsync(userId, ct);
 
         // `*.*.*` is the canonical global-access permission key. `Role.GlobalAccess` flag is the
         // schema-level marker; either grants bypass.
+        return snapshot.HasGlobalAccess || snapshot.RolePermissionKeys.Contains(Permissions.Wildcards.All);
+    }
+
+    public async Task<bool> HasGlobalAccessAsync(
+        long userId,
+        long? userCompanyId,
+        CancellationToken ct = default)
+    {
+        var snapshot = await _rbacRepo.GetUserRbacSnapshotAsync(userId, userCompanyId, ct);
         return snapshot.HasGlobalAccess || snapshot.RolePermissionKeys.Contains(Permissions.Wildcards.All);
     }
 

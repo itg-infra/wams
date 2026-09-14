@@ -14,9 +14,11 @@ using WAMS.Application.Interfaces.Rbac;
 using WAMS.Application.Interfaces.Users;
 using WAMS.Application.Services.Auth;
 using WAMS.Application.Tests.Helpers;
+using WAMS.Domain.Constants;
 using WAMS.Domain.Entities.Auth;
 using WAMS.Domain.Entities.Common;
 using WAMS.Domain.Entities.Companies;
+using WAMS.Domain.Entities.Roles;
 using WAMS.Domain.Entities.Users;
 using WAMS.Domain.Exceptions;
 using Xunit;
@@ -44,6 +46,8 @@ public class AuthServiceTests
                 ["Jwt:RefreshExpirationMinutes"] = "10080"
             })
             .Build();
+        _companyRepo.GetByIdAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => new Company { Id = callInfo.Arg<long>(), IsActive = true });
         _sut = new AuthService(_userRepo, _authRepo, _rbacRepo, _hasher, _companyRepo, _tenantContext, _tokenSvc, _uow, config, _auditLogWriter, _metrics);
     }
 
@@ -254,6 +258,37 @@ public class AuthServiceTests
 
         await act.Should().ThrowAsync<UnauthorizedException>();
         await _authRepo.DidNotReceive().RevokeRefreshTokenAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WithInactiveUser_ThrowsUnauthorizedExceptionAndDoesNotRevoke()
+    {
+        var stored = TestBuilders.ActiveRefreshToken(userId: 1);
+        stored.User.IsActive = false;
+        _authRepo.GetRefreshTokenByHashAsync(Arg.Any<string>(), TestContext.Current.CancellationToken).Returns(stored);
+
+        var act = () => _sut.RefreshAsync(new RefreshRequest("inactive-user-token"), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<UnauthorizedException>();
+        await _authRepo.DidNotReceive().RevokeRefreshTokenAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+        _tokenSvc.DidNotReceive().GenerateAccessToken(
+            Arg.Any<User>(), Arg.Any<List<string>>(), Arg.Any<long>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WithInactiveActingCompany_ThrowsUnauthorizedExceptionAndDoesNotRevoke()
+    {
+        var stored = TestBuilders.SuperAdminRefreshToken(userId: 99, companyId: 2);
+        _authRepo.GetRefreshTokenByHashAsync(Arg.Any<string>(), TestContext.Current.CancellationToken).Returns(stored);
+        _companyRepo.GetByIdAsync(2, Arg.Any<CancellationToken>())
+            .Returns(new Company { Id = 2, IsActive = false });
+
+        var act = () => _sut.RefreshAsync(new RefreshRequest("inactive-company-token"), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<UnauthorizedException>();
+        await _authRepo.DidNotReceive().RevokeRefreshTokenAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+        _tokenSvc.DidNotReceive().GenerateAccessToken(
+            Arg.Any<User>(), Arg.Any<List<string>>(), Arg.Any<long>(), Arg.Any<bool>());
     }
 
     [Fact]
@@ -558,5 +593,227 @@ public class AuthServiceTests
         await _sut.RefreshAsync(new RefreshRequest("old-token"), TestContext.Current.CancellationToken);
 
         _tokenSvc.Received(1).GenerateAccessToken(Arg.Any<User>(), Arg.Any<List<string>>(), Arg.Any<long>(), false);
+    }
+
+    [Fact]
+    public async Task LoginAsync_AllowsSameIdentityInTwoMembershipCompanies()
+    {
+        var user = TestBuilders.ActiveUser(id: 7, companyId: 1, email: "shared@example.com");
+        var membership = new UserCompany
+        {
+            Id = 22,
+            UserId = user.Id,
+            CompanyId = 2,
+            AuthorizationVersion = 4,
+            Roles =
+            [
+                new UserCompanyRole
+                {
+                    UserCompanyId = 22,
+                    RoleId = 30,
+                    Role = new Role { Id = 30, Name = "VIEWER" }
+                }
+            ]
+        };
+        _userRepo.GetLoginIdentityAsync("shared@example.com", 2, Arg.Any<CancellationToken>())
+            .Returns((user, (UserCompany?)membership));
+        _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+        _tokenSvc.GenerateAccessToken(
+                Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>(), 2, 22, 4, false)
+            .Returns("membership-token");
+        _tokenSvc.GenerateRefreshToken().Returns("refresh");
+        _authRepo.CreateRefreshTokenAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>())
+            .Returns(new RefreshToken());
+
+        var result = await _sut.LoginAsync(
+            new LoginRequest("SHARED@EXAMPLE.COM", "pass", 2), null, null,
+            TestContext.Current.CancellationToken);
+
+        result.AccessToken.Should().Be("membership-token");
+        _tokenSvc.Received(1).GenerateAccessToken(
+            user,
+            Arg.Is<IReadOnlyCollection<string>>(roles => roles.SequenceEqual(new[] { "VIEWER" })),
+            2,
+            22,
+            4,
+            false);
+    }
+
+    [Fact]
+    public async Task LoginAsync_RejectsRegularUserWithoutMembershipUsingGenericCredentialsError()
+    {
+        var user = TestBuilders.ActiveUser(id: 7, companyId: 1, email: "shared@example.com");
+        _userRepo.GetLoginIdentityAsync("shared@example.com", 2, Arg.Any<CancellationToken>())
+            .Returns((user, (UserCompany?)null));
+        _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+
+        var act = () => _sut.LoginAsync(
+            new LoginRequest("SHARED@EXAMPLE.COM", "pass", 2), null, null,
+            TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<UnauthorizedException>()
+            .WithMessage(ErrorMessages.Auth.InvalidCredentials);
+    }
+
+    [Fact]
+    public async Task LoginAsync_UsesOnlySelectedMembershipRoles()
+    {
+        var user = TestBuilders.ActiveUser(id: 7, companyId: 1, email: "shared@example.com");
+        user.UserRoles =
+        [
+            new UserRole { UserId = user.Id, RoleId = 10, Role = new Role { Id = 10, Name = "COMPANY_A_ADMIN" } }
+        ];
+        var membership = new UserCompany
+        {
+            Id = 23,
+            UserId = user.Id,
+            CompanyId = 2,
+            Roles =
+            [new UserCompanyRole
+            {
+                UserCompanyId = 23,
+                RoleId = 11,
+                Role = new Role { Id = 11, Name = "COMPANY_B_VIEWER" }
+            }]
+        };
+        _userRepo.GetLoginIdentityAsync("shared@example.com", 2, Arg.Any<CancellationToken>())
+            .Returns((user, (UserCompany?)membership));
+        _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+        _tokenSvc.GenerateAccessToken(
+                Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>(), 2, 23, Arg.Any<int?>(), false)
+            .Returns("token");
+        _tokenSvc.GenerateRefreshToken().Returns("refresh");
+        _authRepo.CreateRefreshTokenAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>())
+            .Returns(new RefreshToken());
+
+        await _sut.LoginAsync(
+            new LoginRequest("SHARED@EXAMPLE.COM", "pass", 2), null, null,
+            TestContext.Current.CancellationToken);
+
+        _tokenSvc.Received(1).GenerateAccessToken(
+            Arg.Any<User>(),
+            Arg.Is<IReadOnlyCollection<string>>(roles => roles.SequenceEqual(new[] { "COMPANY_B_VIEWER" })),
+            2,
+            23,
+            Arg.Any<int?>(),
+            false);
+    }
+
+    [Fact]
+    public async Task LoginAsync_AllowsSuperAdminWithoutMembership()
+    {
+        var user = TestBuilders.SuperAdminUser(companyId: 1);
+        _userRepo.GetLoginIdentityAsync("sa@example.com", 2, Arg.Any<CancellationToken>())
+            .Returns((user, (UserCompany?)null));
+        _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+        _companyRepo.GetByIdAsync(2, Arg.Any<CancellationToken>())
+            .Returns(TestBuilders.Company(id: 2, isActive: true));
+        _tokenSvc.GenerateAccessToken(
+                Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>(), 2, null, null, true)
+            .Returns("sa-token");
+        _tokenSvc.GenerateRefreshToken().Returns("refresh");
+        _authRepo.CreateRefreshTokenAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>())
+            .Returns(new RefreshToken());
+
+        var result = await _sut.LoginAsync(
+            new LoginRequest("SA@EXAMPLE.COM", "pass", 2), null, null,
+            TestContext.Current.CancellationToken);
+
+        result.AccessToken.Should().Be("sa-token");
+        _tokenSvc.Received(1).GenerateAccessToken(
+            user, Arg.Any<IReadOnlyCollection<string>>(), 2, null, null, true);
+    }
+
+    [Fact]
+    public async Task LoginAsync_SuperAdminWithMigratedMembership_UsesGlobalSystemRolesAndNoMembershipClaim()
+    {
+        var user = TestBuilders.SuperAdminUser(companyId: 1);
+        var membership = new UserCompany
+        {
+            Id = 55,
+            UserId = user.Id,
+            CompanyId = 2,
+            AuthorizationVersion = 1,
+            Roles = []
+        };
+        _userRepo.GetLoginIdentityAsync("sa@example.com", 2, Arg.Any<CancellationToken>())
+            .Returns((user, (UserCompany?)membership));
+        _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+        _companyRepo.GetByIdAsync(2, Arg.Any<CancellationToken>())
+            .Returns(TestBuilders.Company(id: 2, isActive: true));
+        _tokenSvc.GenerateAccessToken(
+                Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>(), 2, null, null, true)
+            .Returns("sa-token");
+        _tokenSvc.GenerateRefreshToken().Returns("refresh");
+        _authRepo.CreateRefreshTokenAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>())
+            .Returns(new RefreshToken());
+
+        var result = await _sut.LoginAsync(
+            new LoginRequest("SA@EXAMPLE.COM", "pass", 2), null, null,
+            TestContext.Current.CancellationToken);
+
+        result.AccessToken.Should().Be("sa-token");
+        _tokenSvc.Received(1).GenerateAccessToken(
+            user,
+            Arg.Is<IReadOnlyCollection<string>>(roles => roles.SequenceEqual(new[] { "SUPERADMIN" })),
+            2,
+            null,
+            null,
+            true);
+        await _authRepo.Received(1).CreateRefreshTokenAsync(
+            Arg.Is<RefreshToken>(token => token.CompanyId == 2 && token.UserCompanyId == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RefreshAsync_RejectsRemovedOrVersionChangedMembership()
+    {
+        var stored = TestBuilders.ActiveRefreshToken(userId: 7, companyId: 2);
+        stored.UserCompanyId = 42;
+        stored.MembershipAuthorizationVersion = 3;
+        stored.User.UserCompanies =
+        [new UserCompany
+        {
+            Id = 42,
+            UserId = 7,
+            CompanyId = 2,
+            AuthorizationVersion = 4,
+            RemovedAt = null
+        }];
+        _authRepo.GetRefreshTokenByHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(stored);
+
+        var act = () => _sut.RefreshAsync(
+            new RefreshRequest("old-token"), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<UnauthorizedException>()
+            .WithMessage(ErrorMessages.Auth.InvalidRefreshToken);
+        await _authRepo.DidNotReceive().RevokeRefreshTokenAsync(
+            Arg.Any<long>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_SuperAdminWithMigratedMembership_UsesSystemRoleAndNoMembershipScope()
+    {
+        var user = TestBuilders.SuperAdminUser(companyId: 1);
+        user.UserCompanies =
+        [new UserCompany
+        {
+            Id = 55,
+            UserId = user.Id,
+            CompanyId = 1,
+            Roles = []
+        }];
+        _userRepo.GetByIdUnfilteredReadOnlyAsync(99, Arg.Any<CancellationToken>()).Returns(user);
+        _tenantContext.UserCompanyId.Returns(55L);
+        _rbacRepo.GetUserPermissionKeysAsync(99, Arg.Any<CancellationToken>())
+            .Returns(["*.*.*"]);
+
+        var result = await _sut.GetCurrentUserAsync(99, TestContext.Current.CancellationToken);
+
+        result.Roles.Should().Contain("SUPERADMIN");
+        result.Permissions.Should().Contain("*.*.*");
+        result.HasGlobalAccess.Should().BeTrue();
+        result.UserCompanyId.Should().BeNull();
     }
 }

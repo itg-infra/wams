@@ -22,6 +22,15 @@ public class TokenService : ITokenService
     }
 
     public string GenerateAccessToken(User user, List<string> roles, long companyId, bool hasWildcard = false)
+        => GenerateAccessToken(user, roles, companyId, null, null, hasWildcard);
+
+    public string GenerateAccessToken(
+        User user,
+        IReadOnlyCollection<string> roles,
+        long companyId,
+        long? userCompanyId,
+        int? membershipAuthorizationVersion,
+        bool hasWildcard = false)
     {
         var secret = _config["Jwt:Secret"]!;
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
@@ -36,6 +45,15 @@ public class TokenService : ITokenService
             new("company_id", companyId.ToString()),
             new("session_version", user.SessionVersion.ToString())
         };
+
+        if (userCompanyId.HasValue)
+        {
+            claims.Add(new Claim("user_company_id", userCompanyId.Value.ToString()));
+            if (membershipAuthorizationVersion.HasValue)
+                claims.Add(new Claim(
+                    "membership_authorization_version",
+                    membershipAuthorizationVersion.Value.ToString()));
+        }
 
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
