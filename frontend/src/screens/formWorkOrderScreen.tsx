@@ -42,6 +42,10 @@ export default function FormWorkOrderScreen() {
   const state = location.state as LocationState;
   const budgetPlan = state?.budgetPlan;
 
+  const [selectedActivity, setSelectedActivity] = useState<
+    RealizationApprovedBpApiItem["activities"][0] | null
+  >(null);
+
   // const coaname = budgetPlan.activityTypeName; need to confirm resqi
 
   const LIMIT = 10;
@@ -66,11 +70,24 @@ export default function FormWorkOrderScreen() {
 
     reset();
     setPage(1);
+
+    const type =
+      selectedActivity?.activityTypeCode === "K.BONGKAR" ? "LO" : "MO";
+
+    const docStatus =
+      selectedActivity?.activityTypeCode === "K.BONGKAR" ? "PK" : "";
+
     loadTransportOrders(
-      { budgetPlanId: budgetPlan.budgetPlanId, page: 1, limit: LIMIT },
+      {
+        budgetPlanId: budgetPlan.budgetPlanId,
+        page: 1,
+        limit: LIMIT,
+        type,
+        docStatus,
+      },
       false,
     );
-  }, [isModalOpen]);
+  }, [isModalOpen, selectedActivity?.activityTypeCode]);
 
   const hasMore = meta ? page < meta.totalPages : false;
 
@@ -86,11 +103,25 @@ export default function FormWorkOrderScreen() {
       setIsFetchingMore(true);
       setPage(nextPage);
       loadTransportOrders(
-        { budgetPlanId: budgetPlan.budgetPlanId, page: nextPage, limit: LIMIT },
+        {
+          budgetPlanId: budgetPlan.budgetPlanId,
+          page: nextPage,
+          limit: LIMIT,
+          type:
+            selectedActivity?.activityTypeCode === "K.BONGKAR" ? "LO" : "MO",
+          docStatus:
+            selectedActivity?.activityTypeCode === "K.BONGKAR" ? "PK" : "",
+        },
         true, // append
       ).finally(() => setIsFetchingMore(false));
     }
-  }, [page, hasMore, isFetchingMore, isLoadingTransportOrders]);
+  }, [
+    page,
+    hasMore,
+    isFetchingMore,
+    isLoadingTransportOrders,
+    selectedActivity?.activityTypeCode,
+  ]);
 
   const {
     submitWorkOrder,
@@ -108,10 +139,6 @@ export default function FormWorkOrderScreen() {
     src: string;
     alt: string;
   } | null>(null);
-
-  const [selectedActivity, setSelectedActivity] = useState<
-    RealizationApprovedBpApiItem["activities"][0] | null
-  >(null);
 
   const workOrderCode = selectedActivity?.workOrderCode ?? null;
 

@@ -23,11 +23,13 @@ function ApprovedBudgetPlanTable({
   isLoading,
   error,
   onCreateWO,
+  onDetailWO,
 }: {
   rows: RealizationApprovedBpApiItem[];
   isLoading: boolean;
   error: string | null;
   onCreateWO: (item: RealizationApprovedBpApiItem) => void;
+  onDetailWO: (item: RealizationApprovedBpApiItem) => void;
 }) {
   const columns: Column<RealizationApprovedBpApiItem>[] = [
     {
@@ -69,15 +71,12 @@ function ApprovedBudgetPlanTable({
       header: "Action",
       render: (row) => (
         <Button
-          variant="primary"
+          variant={row.allSubmitted ? "secondary" : "primary"}
           type="button"
-          onClick={() => {
-            if (!row.allSubmitted) onCreateWO(row);
-          }}
-          disabled={row.allSubmitted}
+          onClick={() => (row.allSubmitted ? onDetailWO(row) : onCreateWO(row))}
           className="h-8.5 min-w-30 text-[15px]"
         >
-          Update WO
+          {row.allSubmitted ? "Detail WO" : "Update WO"}
         </Button>
       ),
     },
@@ -113,6 +112,7 @@ export default function RealizationListApprovedBudgetPlan() {
     handlePrevPage,
     handleNextPage,
     handleCreateWO,
+    handleDetailWO,
   } = useRealizationApprovedBpController();
 
   return (
@@ -163,6 +163,7 @@ export default function RealizationListApprovedBudgetPlan() {
             isLoading={isLoading}
             error={error}
             onCreateWO={handleCreateWO}
+            onDetailWO={handleDetailWO}
           />
         </div>
       </div>

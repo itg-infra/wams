@@ -190,6 +190,11 @@ export default function App() {
             />
 
             <Route
+              path="/work-orders/detail/:budgetPlanId"
+              element={<FormWorkOrderScreen />}
+            />
+
+            <Route
               path="/work-orders/edit/:id"
               element={<FormEditWoScreen />}
             />

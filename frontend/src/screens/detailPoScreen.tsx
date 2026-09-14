@@ -6,10 +6,12 @@ import { PageHeader } from "../components/ui/page-header";
 import {
   detailPoService,
   type PurchaseOrderDetailItem,
+  type PurchaseOrderMutationResponse,
 } from "../api/services/budgeting/purchaseOrders/detailPoService";
 import { useExportFileController } from "../controllers/file/exportFileController";
 import { Button } from "../components/ui/button";
 import toast from "react-hot-toast";
+import axios from "axios";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -243,6 +245,14 @@ const isGenerateDisabled = isSubmitting || !canGenerate;
       }
     } catch (error) {
       console.error("Generate APDP error:", error);
+
+      if (axios.isAxiosError<PurchaseOrderMutationResponse>(error)) {
+        toast.error(
+          error.response?.data?.message ||
+            "Terjadi kesalahan saat generate APDP",
+        );
+        return;
+      }
 
       toast.error("Terjadi kesalahan saat generate APDP");
     } finally {

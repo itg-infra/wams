@@ -27,6 +27,8 @@ export interface GetTransportOrdersParams {
   budgetPlanId?: number;
   page?: number;
   limit?: number;
+  type?: string;
+  docStatus?: string;
 }
 
 export const transportOrderService = {
@@ -40,6 +42,8 @@ export const transportOrderService = {
           budgetPlanId: params?.budgetPlanId,
           page: params?.page,
           limit: params?.limit,
+          type: params?.type,
+          docStatus: params?.docStatus,
         },
       },
     );

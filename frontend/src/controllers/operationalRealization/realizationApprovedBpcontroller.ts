@@ -86,6 +86,17 @@ export function useRealizationApprovedBpController(
     [navigate],
   );
 
+  const handleDetailWO = useCallback(
+    (item: RealizationApprovedBpApiItem) => {
+      navigate(`/work-orders/detail/${item.budgetPlanId}`, {
+        state: {
+          budgetPlan: item,
+        },
+      });
+    },
+    [navigate],
+  );
+
   const handleNextPage = useCallback(() => {
     const store = useRealizationApprovedBpstore.getState();
     const totalPages = Math.ceil(store.total / store.limit);
@@ -125,6 +136,7 @@ export function useRealizationApprovedBpController(
     handlePrevPage,
     handleNextPage,
     handleCreateWO,
+    handleDetailWO,
 
     availableItems: store.availableItems,
     availableItemsLoading: store.availableItemsLoading,
