@@ -16,7 +16,6 @@ import {
 } from "../config/activityWoConfig";
 import {
   getWorkOrderActivityDefinition,
-  getWorkOrderActivityLabel,
 } from "../config/workOrderActivityDefinitions";
 import { mapWorkOrderDetailToRows } from "../types/workOrderMapper";
 import { useFileUploadController } from "../controllers/file/fileUploadController";
@@ -424,10 +423,7 @@ export default function FormEditWoScreen() {
               type="button"
               className="min-w-fit whitespace-nowrap rounded-t-[24px] border border-b-0 bg-[#D8DFEA] px-4 py-3 text-xs font-medium text-black md:px-8 md:text-sm"
             >
-              {getWorkOrderActivityLabel(
-                data.activityTypeCode,
-                data.activityName,
-              )}
+              {data.activityTypeDisplay}
             </button>
           )}
         </div>

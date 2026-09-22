@@ -742,10 +742,7 @@ export default function FormWorkOrderScreen() {
                   boxShadow: "0px -2px 5px rgba(0,0,0,0.08)",
                 }}
               >
-                {getWorkOrderActivityLabel(
-                  activity.activityTypeCode,
-                  activity.coaName,
-                )}
+                {getWorkOrderActivityLabel(activity)}
               </button>
             );
           })}

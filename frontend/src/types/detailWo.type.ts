@@ -136,6 +136,7 @@ export interface WorkOrderDetail {
   budgetPlanId: number;
   budgetPlanCode: string;
   activityTypeCode: string;
+  activityTypeDisplay: string;
   itemShadowId: number;
   activityName: string;
   warehouseShadowId: number;

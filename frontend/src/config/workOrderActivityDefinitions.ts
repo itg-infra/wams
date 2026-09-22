@@ -21,59 +21,48 @@ export type WorkOrderFormKind =
   | "rebagging";
 
 export type WorkOrderActivityDefinition = {
-  label: string;
   formKind: WorkOrderFormKind;
   detailKey: WorkOrderDetailKey;
 };
 
 const DEFINITIONS: Record<string, WorkOrderActivityDefinition> = {
   "K.BONGKAR": {
-    label: "Unloading",
     formKind: "unloading",
     detailKey: "unloadingItems",
   },
   "K.MUAT": {
-    label: "Loading",
     formKind: "loading",
     detailKey: "loadingItems",
   },
   FUMIGASI: {
-    label: "Fumigation",
     formKind: "fumigation",
     detailKey: "fumigation",
   },
   "K.GUDANG": {
-    label: "Storage & Handling",
     formKind: "storageHandling",
     detailKey: "storage",
   },
   OPNAME: {
-    label: "Opname",
     formKind: "storageHandling",
     detailKey: "opname",
   },
   OTHERS: {
-    label: "Others",
     formKind: "storageHandling",
     detailKey: "others",
   },
   QC: {
-    label: "QC",
     formKind: "qc",
     detailKey: "qc",
   },
   ALAT_BERAT: {
-    label: "Heavy Equipment",
     formKind: "heavyEquipment",
     detailKey: "heavyEquipment",
   },
   UNBAGGING: {
-    label: "Unbagging",
     formKind: "unbagging",
     detailKey: "unbagging",
   },
   REBAGGING: {
-    label: "Rebagging",
     formKind: "rebagging",
     detailKey: "rebagging",
   },
@@ -85,13 +74,16 @@ export function getWorkOrderActivityDefinition(
   return DEFINITIONS[code] ?? null;
 }
 
-export function getWorkOrderActivityLabel(
-  code: string,
-  coaName?: string | null,
-): string {
-  if (code === "OTHERS" && coaName) {
-    return coaName;
-  }
+type WorkOrderActivityLabelInput = {
+  activityTypeCode: string;
+  activityTypeDisplay?: string | null;
+  coaName?: string | null;
+};
 
-  return getWorkOrderActivityDefinition(code)?.label ?? code;
+export function getWorkOrderActivityLabel(
+  activity: WorkOrderActivityLabelInput,
+): string {
+  return activity.activityTypeCode === "OTHERS" && activity.coaName
+    ? activity.coaName
+    : activity.activityTypeDisplay ?? activity.activityTypeCode;
 }
