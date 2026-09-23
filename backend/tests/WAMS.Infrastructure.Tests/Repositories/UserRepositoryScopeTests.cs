@@ -190,6 +190,52 @@ public class UserRepositoryScopeTests
     }
 
     [Fact]
+    public async Task UpdateAsync_UpdatesDetachedUserWithMembershipGraph()
+    {
+        var o = NewDb();
+        await using (var seedDb = Open(o))
+        {
+            var company = new Company { Id = 1, Name = "C", Code = "C001", IsActive = true };
+            var user = new User
+            {
+                Id = 22,
+                Email = "target@t.c",
+                Fullname = "Before",
+                CompanyId = company.Id,
+                Company = company,
+                IsActive = true
+            };
+            user.UserCompanies.Add(new UserCompany
+            {
+                Id = 220,
+                UserId = user.Id,
+                CompanyId = company.Id,
+                Company = company,
+                User = user
+            });
+            seedDb.AddRange(company, user);
+            await seedDb.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.IsSet.Returns(true);
+        tenant.CompanyId.Returns(1L);
+        await using var db = new AppDbContext(o, tenant);
+        var repo = new UserRepository(db, tenant);
+
+        var userToUpdate = await repo.GetByIdAsync(22, TestContext.Current.CancellationToken);
+        userToUpdate.Should().NotBeNull();
+        userToUpdate!.Fullname = "After";
+
+        await repo.UpdateAsync(userToUpdate, TestContext.Current.CancellationToken);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using var verifyDb = Open(o);
+        (await verifyDb.Users.SingleAsync(u => u.Id == 22, TestContext.Current.CancellationToken))
+            .Fullname.Should().Be("After");
+    }
+
+    [Fact]
     public async Task UnfilteredReadOnlyLookup_LoadsCurrentUserAcrossActingCompanyBoundary()
     {
         var o = NewDb();

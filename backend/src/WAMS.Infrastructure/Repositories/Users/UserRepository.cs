@@ -218,7 +218,7 @@ public class UserRepository : IUserRepository
 
     public Task UpdateAsync(User user, CancellationToken ct = default)
     {
-        _db.Users.Update(user);
+        _db.Entry(user).State = EntityState.Modified;
         return Task.CompletedTask;
     }
 
