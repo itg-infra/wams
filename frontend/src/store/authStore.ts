@@ -58,6 +58,7 @@ export const useAuthStore = create<AuthState>()(
 
                     return (
                         map?.["*"]?.["*"]?.includes("*") ||
+                        map?.["*"]?.["*"]?.includes(action) ||
 
                         
                         map?.[module]?.["*"]?.includes("*") ||

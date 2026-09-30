@@ -80,7 +80,7 @@ public class SapApiClient(
 
         var url = $"/WAMS/PurchaseOrders?Entity={Uri.EscapeDataString(entity)}";
         var body = await PostAndReadBodyAsync(url, dto, request.PoCode, "CreatePurchaseOrderAsync", ct);
-        var (docEntry, docNum) = ExtractDocIdentifiers(body, request.PoCode, "CreatePurchaseOrderAsync");
+        var (docEntry, docNum) = ExtractDocIdentifiers(body, request.PoCode, "CreatePurchaseOrderAsync", url, dto);
 
         // Create response has never been observed to include docNum (only docEntry) - fetch it
         // via GET so SapPoNumber is the human-facing SAP number, not the internal DocEntry.
@@ -153,7 +153,7 @@ public class SapApiClient(
 
         var url = $"/WAMS/APDP?Entity={Uri.EscapeDataString(entity)}";
         var body = await PostAndReadBodyAsync(url, dto, request.ApCode, "CreateApDownPaymentAsync", ct);
-        var docEntry = ParseDocEntry(body, request.ApCode, "CreateApDownPaymentAsync");
+        var docEntry = ParseDocEntry(body, request.ApCode, "CreateApDownPaymentAsync", url, dto);
 
         return new SapCreateApdpResult(docEntry);
     }
@@ -221,7 +221,7 @@ public class SapApiClient(
 
         var url = $"/WAMS/APInvoice?Entity={Uri.EscapeDataString(entity)}";
         var body = await PostAndReadBodyAsync(url, dto, request.ApCode, "CreateApInvoiceAsync", ct);
-        var (docEntry, docNum) = ExtractDocIdentifiers(body, request.ApCode, "CreateApInvoiceAsync");
+        var (docEntry, docNum) = ExtractDocIdentifiers(body, request.ApCode, "CreateApInvoiceAsync", url, dto);
 
         docNum ??= await FetchDocNumAsync("/WAMS/APInvoice", docEntry, entity, ct);
 
@@ -367,7 +367,9 @@ public class SapApiClient(
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogError(ex, "[SapApiClient] {Operation} request failed. Code={Code}", operationName, code);
+            logger.LogError(ex,
+                "[SapApiClient] {Operation} request failed. Code={Code} Endpoint={Endpoint} RequestBody={RequestBody}",
+                operationName, code, url, SerializeRequest(dto));
             throw new ValidationException($"SAP call failed for {code}: {ex.Message}");
         }
 
@@ -376,8 +378,8 @@ public class SapApiClient(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogError(
-                "[SapApiClient] {Operation} non-success response. Code={Code} Status={Status} Body={Body}",
-                operationName, code, (int)response.StatusCode, body);
+                "[SapApiClient] {Operation} non-success response. Code={Code} Endpoint={Endpoint} Status={Status} RequestBody={RequestBody} Body={Body}",
+                operationName, code, url, (int)response.StatusCode, SerializeRequest(dto), body);
             throw BuildSapRejectionException(code, body);
         }
 
@@ -443,8 +445,10 @@ public class SapApiClient(
         }
     }
 
-    private int ParseDocEntry(string body, string code, string operationName) =>
-        ExtractDocIdentifiers(body, code, operationName).DocEntry;
+    private int ParseDocEntry(string body, string code, string operationName, string endpoint, object request) =>
+        ExtractDocIdentifiers(body, code, operationName, endpoint, request).DocEntry;
+
+    private static string SerializeRequest(object? request) => JsonSerializer.Serialize(request, JsonSerializerOptions.Web);
 
     /// <summary>
     /// Create response omits docNum (only docEntry) - fetch it via GET so SapPoNumber/SapApNumber
@@ -480,7 +484,8 @@ public class SapApiClient(
     /// Tolerates SAP's response envelope ({"success","message","data","errors"}) plus the
     /// unwrapped/bare-number shapes seen in practice. Case-insensitive property lookup.
     /// </summary>
-    private (int DocEntry, int? DocNum) ExtractDocIdentifiers(string body, string code, string operationName)
+    private (int DocEntry, int? DocNum) ExtractDocIdentifiers(
+        string body, string code, string operationName, string endpoint, object request)
     {
         JsonDocument doc;
         try
@@ -489,8 +494,9 @@ public class SapApiClient(
         }
         catch (JsonException ex)
         {
-            logger.LogError(ex, "[SapApiClient] {Operation} unparsable response. Code={Code} Body={Body}",
-                operationName, code, body);
+            logger.LogError(ex,
+                "[SapApiClient] {Operation} unparsable response. Code={Code} Endpoint={Endpoint} RequestBody={RequestBody} Body={Body}",
+                operationName, code, endpoint, SerializeRequest(request), body);
             throw new ValidationException($"SAP returned an unrecognized response for {code}");
         }
 
@@ -500,8 +506,9 @@ public class SapApiClient(
 
             if (root.TryGetProperty("success", out var successEl) && successEl.ValueKind == JsonValueKind.False)
             {
-                logger.LogError("[SapApiClient] {Operation} SAP reported failure. Code={Code} Body={Body}",
-                    operationName, code, body);
+                logger.LogError(
+                    "[SapApiClient] {Operation} SAP reported failure. Code={Code} Endpoint={Endpoint} RequestBody={RequestBody} Body={Body}",
+                    operationName, code, endpoint, SerializeRequest(request), body);
                 var message = root.TryGetProperty("message", out var msgEl) ? msgEl.GetString() : null;
                 if (message is not null)
                 {
@@ -524,7 +531,8 @@ public class SapApiClient(
                 else if (dataEl.ValueKind == JsonValueKind.Number && dataEl.TryGetInt32(out var bareDocEntry))
                 {
                     logger.LogInformation(
-                        "[SapApiClient] {Operation} response. Code={Code} Body={Body}", operationName, code, body);
+                        "[SapApiClient] {Operation} response. Code={Code} SapDocEntry={SapDocEntry}",
+                        operationName, code, bareDocEntry);
                     return (bareDocEntry, null);
                 }
             }
@@ -535,13 +543,15 @@ public class SapApiClient(
                 if (docEntry is not null)
                 {
                     logger.LogInformation(
-                        "[SapApiClient] {Operation} response. Code={Code} Body={Body}", operationName, code, body);
+                        "[SapApiClient] {Operation} response. Code={Code} SapDocEntry={SapDocEntry} SapDocNum={SapDocNum}",
+                        operationName, code, docEntry.Value, TryGetIntCaseInsensitive(target, "docNum"));
                     return (docEntry.Value, TryGetIntCaseInsensitive(target, "docNum"));
                 }
             }
 
-            logger.LogError("[SapApiClient] {Operation} response missing DocEntry. Code={Code} Body={Body}",
-                operationName, code, body);
+            logger.LogError(
+                "[SapApiClient] {Operation} response missing DocEntry. Code={Code} Endpoint={Endpoint} RequestBody={RequestBody} Body={Body}",
+                operationName, code, endpoint, SerializeRequest(request), body);
             throw new ValidationException($"SAP did not return a document number for {code}");
         }
     }

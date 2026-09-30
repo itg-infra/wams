@@ -45,6 +45,7 @@ import AddUserScreen from "./screens/add_users_screen";
 import AddRoleScreen from "./screens/add_role_screen";
 import { DetailApScreen } from "./screens/detailApScreen";
 import ProfileScreen from "./screens/profile_screen";
+import LogsScreen from "./screens/logs_screen";
 
 export default function App() {
   return (
@@ -67,6 +68,9 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomeDashboardScreen />}>
             <Route path="profile" element={<ProfileScreen />} />
+            <Route element={<RequirePermission permission="audit.log.read" />}>
+              <Route path="system/logs" element={<LogsScreen />} />
+            </Route>
             <Route
               element={<RequirePermission permission="report.dashboard.read" />}
             >

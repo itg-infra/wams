@@ -1882,6 +1882,12 @@ All values can be supplied as environment variables (e.g. `ObjectStorage__Endpoi
 | `GET` | `/api/v1/auth/me` | Any authenticated user |
 | `POST` | `/api/v1/auth/change-password` | Any authenticated user (self-service, requires current password; rate-limited 10/min per IP) |
 
+### Logs
+
+| Method | Endpoint | Permission |
+|--------|----------|------------|
+| `GET` | `/api/v1/logs?lines=100` | `audit.log.read` (plain text; latest 100 lines by default, maximum 1,000) |
+
 ### Users
 
 | Method | Endpoint | Permission |

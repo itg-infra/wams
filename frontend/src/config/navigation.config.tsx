@@ -103,7 +103,6 @@ export const NAV_ITEMS: SidebarItem[] = [
       },
     ],
   },
-
   {
     id: "budgeting",
     label: "Budgeting",
@@ -213,6 +212,22 @@ export const NAV_ITEMS: SidebarItem[] = [
             permission: "report.finance-report.read",
           },
         ],
+      },
+    ],
+  },
+  {
+    id: "system",
+    label: "System",
+    elementId: "trm_MenuSystem",
+    icon: (
+      <img src="/sidebaricon/reports.png" alt="System" className="w-4 h-4" />
+    ),
+    children: [
+      {
+        id: "/system/logs",
+        label: "Logs",
+        elementId: "trm_MenuSystemLogs",
+        permission: "audit.log.read",
       },
     ],
   },
