@@ -44,13 +44,16 @@ public class SapApiClientTests
 
     private static SapApiClient CreateSut(
         HttpStatusCode status, string body, out FakeHttpHandler handler,
-        Func<Uri, HttpResponseMessage> erpResponder, out FakeErpHttpHandler erpHandler)
+        Func<Uri, HttpResponseMessage> erpResponder, out FakeErpHttpHandler erpHandler,
+        string? sapEntity = "Test")
     {
         handler = new FakeHttpHandler(status, body);
+
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://sap.test") };
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection([new("ErpApi:SapEntity", "Test")])
-            .Build();
+        var settings = sapEntity is null
+            ? Array.Empty<KeyValuePair<string, string?>>()
+            : [new("ErpApi:SapEntity", sapEntity)];
+        var config = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
 
         erpHandler = new FakeErpHttpHandler(erpResponder);
         var erpHttp = new HttpClient(erpHandler) { BaseAddress = new Uri("http://erp.test") };
@@ -64,6 +67,10 @@ public class SapApiClientTests
 
         return new SapApiClient(http, config, Substitute.For<ILogger<SapApiClient>>(), erpClient, tenantContext, companyRepo);
     }
+
+    private static SapApiClient CreateSut(
+        HttpStatusCode status, string body, out FakeHttpHandler handler, string? sapEntity) =>
+        CreateSut(status, body, out handler, DefaultOcrResponder, out _, sapEntity);
 
     private static HttpResponseMessage DefaultOcrResponder(Uri uri)
     {
@@ -103,6 +110,32 @@ public class SapApiClientTests
         result.Should().NotBeNull();
         result!.SapDocEntry.Should().Be(501);
         result.SapPoNumber.Should().Be("9001");
+    }
+
+    [Fact]
+    public async Task SapWrites_WithoutEntityOverride_UseRequestCompanyCode()
+    {
+        var po = CreateSut(HttpStatusCode.OK, """{"docEntry":501,"docNum":9001}""", out var poHandler, sapEntity: null);
+        var apdp = CreateSut(HttpStatusCode.OK, """{"docEntry":301}""", out var apdpHandler, sapEntity: null);
+        var invoice = CreateSut(HttpStatusCode.OK, """{"docEntry":401,"docNum":9101}""", out var invoiceHandler, sapEntity: null);
+
+        await po.CreatePurchaseOrderAsync(CreateRequest(), TestContext.Current.CancellationToken);
+        await apdp.CreateApDownPaymentAsync(CreateApdpRequest(), TestContext.Current.CancellationToken);
+        await invoice.CreateApInvoiceAsync(CreateApInvoiceRequest(), TestContext.Current.CancellationToken);
+
+        poHandler.LastRequestUri!.Query.Should().Be("?Entity=COMP01");
+        apdpHandler.LastRequestUri!.Query.Should().Be("?Entity=COMP01");
+        invoiceHandler.LastRequestUri!.Query.Should().Be("?Entity=COMP01");
+    }
+
+    [Fact]
+    public async Task CreatePurchaseOrderAsync_EntityOverride_UsesConfiguredEntity()
+    {
+        var sut = CreateSut(HttpStatusCode.OK, """{"docEntry":501,"docNum":9001}""", out var handler, "Test");
+
+        await sut.CreatePurchaseOrderAsync(CreateRequest(), TestContext.Current.CancellationToken);
+
+        handler.LastRequestUri!.Query.Should().Be("?Entity=Test");
     }
 
     [Fact]
@@ -532,10 +565,12 @@ public class SapApiClientTests
     private sealed class FakeHttpHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
         public string? LastRequestBody { get; private set; }
+        public Uri? LastRequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            LastRequestUri = request.RequestUri;
             if (request.Content is not null)
             {
                 LastRequestBody = await request.Content.ReadAsStringAsync(cancellationToken);

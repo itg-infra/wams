@@ -13,8 +13,8 @@ using WAMS.Infrastructure.ExternalSync.ErpHttpClient;
 
 /// <summary>
 /// Production SAP client (openapi/sap.json), enabled via ErpApi:UseMockSap=false. No HTTP retry
-/// policy - retrying a create-POST risks duplicate SAP docs. Writes target ErpApi:SapEntity; the
-/// Lk* cost-center/project lookups instead use the request's own tenant company code.
+/// policy - retrying a create-POST risks duplicate SAP docs. Writes use ErpApi:SapEntity when
+/// configured, otherwise the request's tenant company code; Lk* lookups always use that code.
 /// </summary>
 public class SapApiClient(
     HttpClient http,
@@ -28,8 +28,8 @@ public class SapApiClient(
     public async Task<SapCreatePoResult?> CreatePurchaseOrderAsync(
         SapCreatePoRequest request, CancellationToken ct = default)
     {
-        var entity = RequireEntity();
         var companyCode = await RequireCompanyCodeAsync(ct);
+        var entity = configuration["ErpApi:SapEntity"] ?? companyCode;
         var departmentCode = GetDepartmentCode();
         var docCurrency = GetDocCurrency();
         var warehouseCache = new Dictionary<string, (string? Branch, string? Warehouse)>();
@@ -93,8 +93,8 @@ public class SapApiClient(
     public async Task<SapCreateApdpResult?> CreateApDownPaymentAsync(
         SapCreateApdpRequest request, CancellationToken ct = default)
     {
-        var entity = RequireEntity();
         var companyCode = await RequireCompanyCodeAsync(ct);
+        var entity = configuration["ErpApi:SapEntity"] ?? companyCode;
         var departmentCode = GetDepartmentCode();
         var docCurrency = GetDocCurrency();
         var poBaseType = GetPoBaseType();
@@ -161,8 +161,8 @@ public class SapApiClient(
     public async Task<SapCreateApInvoiceResult?> CreateApInvoiceAsync(
         SapCreateApInvoiceRequest request, CancellationToken ct = default)
     {
-        var entity = RequireEntity();
         var companyCode = await RequireCompanyCodeAsync(ct);
+        var entity = configuration["ErpApi:SapEntity"] ?? companyCode;
         var departmentCode = GetDepartmentCode();
         var docCurrency = GetDocCurrency();
         var poBaseType = GetPoBaseType();
@@ -230,10 +230,7 @@ public class SapApiClient(
         return new SapCreateApInvoiceResult(sapApNumber, docEntry);
     }
 
-    private string RequireEntity() => configuration["ErpApi:SapEntity"] 
-        ?? throw new InvalidOperationException("ErpApi:SapEntity is not configured");
-
-    /// <summary>Requesting user's own company code, for the Lk* lookups (separate from RequireEntity/SapEntity, which targets SAP writes).</summary>
+    /// <summary>Requesting user's own company code, used by SAP lookups and as the default write Entity.</summary>
     private async Task<string> RequireCompanyCodeAsync(CancellationToken ct)
     {
         var companyId = tenantContext.CompanyId
